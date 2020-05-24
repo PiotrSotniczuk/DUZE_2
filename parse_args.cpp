@@ -18,7 +18,7 @@ void checkEssen(bool *essentials, int nr_essen){
 }
 
 void set_args(int argc, char** argv, string *host, string *resource,
-	unsigned long int *port, bool *metaData, unsigned long int *timeout){
+	string *port, bool *metaData, unsigned long int *timeout){
 	bool essentials[ESSENTIALS_SUM];
 	if(argc < ESSENTIALS_SUM*2 + 1){
 		fatal("Bad number of args");
@@ -39,11 +39,7 @@ void set_args(int argc, char** argv, string *host, string *resource,
 
 		if(strcmp(argv[i], "-p") == 0){
 			checkEssen(essentials, ESSEN_P);
-			char *endptr;
-			(*port) = strtoul(argv[i+1], &endptr, 10);
-			if(endptr == argv[i+1] || (*port) > 65535){
-				fatal("Argument -p bad port");
-			}
+			(*port) = argv[i+1];
 		}
 
 		if(strcmp(argv[i], "-m") == 0){
