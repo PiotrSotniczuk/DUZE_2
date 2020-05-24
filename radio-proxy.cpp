@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <cstring>
 #include <iostream>
+#include <csignal>
 
 #define BUFF_SIZE 5000
 #define HTTP_0 "HTTP/1.0 200 OK\r\n"
@@ -17,10 +18,17 @@
 
 using namespace std;
 
+int sock;
+
+void sigint_handler(int signal_num){
+	if (close(sock) < 0)
+		syserr("closing stream socket");
+	exit (0);
+}
+
 // instructions from labs combined into one function to initialize socket
-int get_socket(const char *connect_adr, const char *port){
+void get_socket(const char *connect_adr, const char *port){
 	int err;
-	int sock;
 	struct addrinfo addr_hints;
 	struct addrinfo *addr_result;
 
@@ -49,7 +57,6 @@ int get_socket(const char *connect_adr, const char *port){
 		syserr("connect");
 
 	freeaddrinfo(addr_result);
-	return sock;
 }
 
 int main(int argc, char* argv[]) {
@@ -64,13 +71,20 @@ int main(int argc, char* argv[]) {
 
 
 	// writing down the request
-	// cookies start with space so no space after "Cookie:"
+	string meta;
+	if(metaData){
+		meta = "1";
+	}else{
+		meta = "0";
+	}
 	string buffer_send = "GET " + resource + " HTTP/1.0\r\nHost: "
 		+ host + "\r\n"
-		   + "Icy-MetaData:1\r\n" +
+		   + "Icy-MetaData:"+ meta + "\r\n" +
 		   + "Connection: close\r\n\r\n";
 
-	int sock = get_socket(host.c_str(), port.c_str());
+	// setting global sock
+	get_socket(host.c_str(), port.c_str());
+	signal(SIGINT, sigint_handler);
 
 	// send request
 	unsigned long size_send = buffer_send.size();
@@ -79,15 +93,15 @@ int main(int argc, char* argv[]) {
 	}
 
 	// receiving stream turned into a file
-	FILE *response = NULL;
+	FILE *response;
 	response = fdopen(sock, "r");
-	if(response == NULL){
+	if(response == nullptr){
 		fatal("Cannot open socekt as file");
 	}
 
 	unsigned long line_size = BUFF_SIZE;
 	char* line = static_cast<char *>(malloc(line_size * sizeof(char)));
-	if(line == NULL){
+	if(line == nullptr){
 		fatal("Cannot alloc memory");
 	}
 
@@ -98,17 +112,17 @@ int main(int argc, char* argv[]) {
 	// checking if status line is OK
 	if(strcmp(line, ICY) != 0 && strcmp(line, HTTP_0) != 0 &&
 		strcmp(line, HTTP_1) != 0){
-		cerr << "ERROR: Bad status line\n";
 		if (close(sock) < 0)
-			syserr("closing stream socket");
-		return 0;
+			syserr("Closing stream socket");
+		fatal("Status line");
 	}
 
-	cout << line;
+	cerr << line;
 	//read header
-	bool chunked = false;
+	// TODO read the metadate interval send it to err
+	// TODO Use timeout and dont use getline
 	while(getline(&line, &line_size, response) > 2){ //break if only \r\n
-		cout << string(line);
+		cerr << string(line);
 	}
 
 	if(strcmp(line, "\r\n") != 0){
