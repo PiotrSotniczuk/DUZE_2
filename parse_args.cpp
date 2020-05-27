@@ -18,13 +18,13 @@ void checkEssen(bool *essentials, int nr_essen){
 }
 
 void set_args(int argc, char** argv, string *host, string *resource,
-	string *port, bool *metaData, unsigned long int *timeout){
+	string *portA, string *meta, unsigned long int *timeoutA, string *portB,
+	string *multi, unsigned long int *timeoutB){
 	bool essentials[ESSENTIALS_SUM];
 	if(argc < ESSENTIALS_SUM*2 + 1){
 		fatal("Bad number of args");
 	}
 
-	// only A
 	memset(essentials, false, 3);
 	for(int i = 1; i < argc; i = i + 2){
 		if(strcmp(argv[i], "-h") == 0){
@@ -39,15 +39,15 @@ void set_args(int argc, char** argv, string *host, string *resource,
 
 		if(strcmp(argv[i], "-p") == 0){
 			checkEssen(essentials, ESSEN_P);
-			(*port) = argv[i+1];
+			(*portA) = argv[i+1];
 		}
 
 		if(strcmp(argv[i], "-m") == 0){
 			if(strcmp(argv[i+1], "yes") == 0){
-				(*metaData) = true;
+				(*meta) = "1";
 			}else{
 				if(strcmp(argv[i+1], "no") == 0){
-					(*metaData) = false;
+					(*meta) = "0";
 				}else{
 					fatal("Argument -m is not yes|no");
 				}
@@ -56,9 +56,25 @@ void set_args(int argc, char** argv, string *host, string *resource,
 
 		if(strcmp(argv[i], "-t") == 0){
 			char *endptr;
-			(*timeout) = strtoul(argv[i+1], &endptr, 10);
+			(*timeoutA) = strtoul(argv[i+1], &endptr, 10);
 			if(endptr == argv[i+1]){
 				fatal("Argument -t bad timeout");
+			}
+		}
+
+		if(strcmp(argv[i], "-P") == 0){
+			(*portB) = argv[i+1];
+		}
+
+		if(strcmp(argv[i], "-B") == 0){
+			(*multi) = argv[i+1];
+		}
+
+		if(strcmp(argv[i], "-T") == 0){
+			char *endptr;
+			(*timeoutA) = strtoul(argv[i+1], &endptr, 10);
+			if(endptr == argv[i+1]){
+				fatal("Argument -T bad timeout");
 			}
 		}
 	}

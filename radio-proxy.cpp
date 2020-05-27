@@ -9,10 +9,11 @@
 #include <iostream>
 #include <csignal>
 
-#define BUFF_SIZE 5000
+#define BUFF_SIZE 7048
 #define HTTP_0 "HTTP/1.0 200 OK\r\n"
 #define HTTP_1 "HTTP/1.1 200 OK\r\n"
 #define ICY "ICY 200 OK\r\n"
+#define META_DATA "icy-metaint:"
 
 
 
@@ -59,31 +60,58 @@ void get_socket(const char *connect_adr, const char *port){
 	freeaddrinfo(addr_result);
 }
 
+void print_cout_cerr(FILE *response, unsigned long int metaInt){
+	char buff[BUFF_SIZE + 1];
+	buff[BUFF_SIZE] = '\0';
+
+	unsigned long int n = metaInt/BUFF_SIZE;
+	while(true) {
+		for (int i = 0; i < n; i++) {
+			fread(&buff, 1, BUFF_SIZE, response);
+			printf("%.*s", BUFF_SIZE, buff);
+		}
+		fread(&buff, 1, metaInt % BUFF_SIZE, response);
+		printf("%.*s", metaInt % BUFF_SIZE, buff);
+
+		fread(&buff, 1, 1, response);
+		char size = buff[0];
+		fread(&buff, 1, size * 16, response);
+		fprintf(stderr, "%.*s", size * 16, buff);
+	}
+}
+
 int main(int argc, char* argv[]) {
 
 	string host;
 	string resource;
-	string port;
-	bool metaData = false;
-	unsigned long int timeout = 5;
+	string portA;
+	string meta = "0";
+	unsigned long int timeoutA = 5;
+	string portB;
+	string multi;
+	unsigned long int timeoutB = 5;
 
-	set_args(argc, argv, &host, &resource, &port, &metaData, &timeout);
+
+
+
+	set_args(argc, argv, &host, &resource, &portA, &meta, &timeoutA, &portB,
+		&multi, &timeoutB);
 
 
 	// writing down the request
-	string meta;
-	if(metaData){
-		meta = "1";
-	}else{
-		meta = "0";
-	}
 	string buffer_send = "GET " + resource + " HTTP/1.0\r\nHost: "
 		+ host + "\r\n"
 		   + "Icy-MetaData:"+ meta + "\r\n" +
 		   + "Connection: close\r\n\r\n";
 
 	// setting global sock
-	get_socket(host.c_str(), port.c_str());
+	get_socket(host.c_str(), portA.c_str());
+	struct timeval timeout;
+	timeout.tv_sec = timeoutA;
+	timeout.tv_usec = 0;
+	if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (void *)&timeout, sizeof(timeout)) < 0)
+		syserr("setsockopt failed");
+
 	signal(SIGINT, sigint_handler);
 
 	// send request
@@ -110,19 +138,30 @@ int main(int argc, char* argv[]) {
 	}
 
 	// checking if status line is OK
-	if(strcmp(line, ICY) != 0 && strcmp(line, HTTP_0) != 0 &&
-		strcmp(line, HTTP_1) != 0){
+	if(strncasecmp(line, ICY, strlen(ICY)) != 0 &&
+		strncasecmp(line, HTTP_0, strlen(HTTP_0)) != 0 &&
+		strncasecmp(line, HTTP_1, strlen(HTTP_1)) != 0){
 		if (close(sock) < 0)
 			syserr("Closing stream socket");
 		fatal("Status line");
 	}
 
-	cerr << line;
+
+	//cerr << line;
 	//read header
-	// TODO read the metadate interval send it to err
-	// TODO Use timeout and dont use getline
+	unsigned long int metaInt;
 	while(getline(&line, &line_size, response) > 2){ //break if only \r\n
-		cerr << string(line);
+		if(strncasecmp(line, META_DATA, strlen(META_DATA)) == 0){
+			if(meta == "0"){
+				fatal("Radio sends unwanted metadata");
+			}
+			char *endptr;
+			metaInt = strtoul(line + strlen(META_DATA), &endptr, 10);
+			if(endptr == line){
+				fatal("Bad metaInt number");
+			}
+		}
+		//cerr << line;
 	}
 
 	if(strcmp(line, "\r\n") != 0){
@@ -130,11 +169,12 @@ int main(int argc, char* argv[]) {
 	}
 	free(line);
 
-	char buff[BUFF_SIZE];
-	while(fread(&buff, 1, BUFF_SIZE, response) == BUFF_SIZE){
-		cout << string(buff);
+
+	if(portB.empty()){
+		print_cout_cerr(response, metaInt);
 	}
 
+	// TODO wysylaj wszystko naraz skad beda wiedzieli
 
 	return 0;
 }
