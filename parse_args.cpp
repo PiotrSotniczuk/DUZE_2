@@ -72,7 +72,7 @@ void set_args(int argc, char** argv, string *host, string *resource,
 
 		if(strcmp(argv[i], "-T") == 0){
 			char *endptr;
-			(*timeoutA) = strtoul(argv[i+1], &endptr, 10);
+			(*timeoutB) = strtoul(argv[i+1], &endptr, 10);
 			if(endptr == argv[i+1]){
 				fatal("Argument -T bad timeout");
 			}
