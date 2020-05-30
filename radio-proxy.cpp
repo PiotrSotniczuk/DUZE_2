@@ -1,60 +1,26 @@
 #include <string>
-#include "parse_args.h"
+#include "initialize.h"
 #include "err.h"
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <netdb.h>
 #include <unistd.h>
-#include <cstring>
 #include <csignal>
+#include <poll.h>
+#include <netdb.h>
 
 #define BUFF_SIZE 4080
-#define HTTP_0 "HTTP/1.0 200 OK\r\n"
-#define HTTP_1 "HTTP/1.1 200 OK\r\n"
-#define ICY "ICY 200 OK\r\n"
-#define META_DATA "icy-metaint:"
 
 using namespace std;
 
-int sock;
+static bool finishA;
+static bool finishB;
 
-void sigint_handler([[maybe_unused]]int signal_num){
-	if (close(sock) < 0)
-		syserr("closing stream socket");
-	exit (0);
-}
+// TODO czy zawsze close nawet przy bledzie
 
-// instructions from labs combined into one function to initialize socket
-void get_socket(const char *connect_adr, const char *port){
-	int err;
-	struct addrinfo addr_hints;
-	struct addrinfo *addr_result;
 
-	// 'converting' host/port in string to struct addrinfo
-	memset(&addr_hints, 0, sizeof(struct addrinfo));
-	addr_hints.ai_family = AF_INET; // IPv4
-	addr_hints.ai_socktype = SOCK_STREAM; //TCP takie ma
-	addr_hints.ai_protocol = IPPROTO_TCP; //tez ze TCP
-	err = getaddrinfo(connect_adr, port, &addr_hints, &addr_result);
-
-	if (err == EAI_SYSTEM) { // system error
-		syserr("getaddrinfo: %s", gai_strerror(err));
-	} else if (err != 0) { // other error (host not found, etc.)
-		fatal("getaddrinfo: %s", gai_strerror(err));
-	}
-
-	// initialize socket according to getaddrinfo results
-	sock = socket(addr_result->ai_family,
-				  addr_result->ai_socktype,
-				  addr_result->ai_protocol);
-	if (sock < 0)
-		syserr("socket");
-
-	// connect socket to the server
-	if (connect(sock, addr_result->ai_addr, addr_result->ai_addrlen) < 0)
-		syserr("connect");
-
-	freeaddrinfo(addr_result);
+void sigint_handlerA([[maybe_unused]]int signal_num){
+	finishA = true;
+	finishB = true;
 }
 
 void read_write(FILE *response, int descriptor, char *buff, unsigned int size){
@@ -66,84 +32,42 @@ void read_write(FILE *response, int descriptor, char *buff, unsigned int size){
 	}
 }
 
-void print_cout_cerr(FILE *response, const string& meta, unsigned long int metaInt){
+void print_cout_cerr(FILE *response, const string& meta,
+	unsigned long int metaInt, int sockA){
 	char buff[BUFF_SIZE];
 
 	if(meta == "0"){
-		while(true){
+		while(!finishA){
 			read_write(response, STDOUT_FILENO, buff, BUFF_SIZE);
 		}
-	}
-
-	unsigned long int n = metaInt/BUFF_SIZE;
-	while(true) {
-		for (unsigned int i = 0; i < n; i++) {
-			read_write(response, STDOUT_FILENO, buff, BUFF_SIZE);
-		}
-		read_write(response, STDOUT_FILENO, buff, metaInt % BUFF_SIZE);
-
-		if(fread(&buff, 1, 1, response) != 1){
-			fatal("Cannot read meta size byte");
-		}
-		char size = buff[0];
-		read_write(response, STDERR_FILENO, buff, size * 16);
-	}
-}
-
-void read_header(FILE *response, string *meta, unsigned long int *metaInt){
-	unsigned long line_size = BUFF_SIZE;
-	char* line = static_cast<char *>(malloc(line_size * sizeof(char)));
-	if(line == nullptr){
-		fatal("Cannot alloc memory");
-	}
-
-	if(getline(&line, &line_size, response) <= 0){
-		fatal("Cannot read from file or no response from server");
-	}
-
-	// checking if status line is OK
-	if(strncasecmp(line, ICY, strlen(ICY)) != 0 &&
-		strncasecmp(line, HTTP_0, strlen(HTTP_0)) != 0 &&
-		strncasecmp(line, HTTP_1, strlen(HTTP_1)) != 0){
-		if (close(sock) < 0)
-			syserr("Closing stream socket");
-		fatal("Status line");
-	}
-
-	//cerr << line;
-	//read header
-	(*metaInt) = 0;
-	while(getline(&line, &line_size, response) > 2){ //break if only \r\n
-		if(strncasecmp(line, META_DATA, strlen(META_DATA)) == 0){
-			if((*meta) == "0"){
-				fatal("Radio sends unwanted metadata");
+	}else {
+		unsigned long int n = metaInt / BUFF_SIZE;
+		while (!finishA) {
+			for (unsigned int i = 0; i < n; i++) {
+				read_write(response, STDOUT_FILENO, buff, BUFF_SIZE);
 			}
-			char *endptr;
-			(*metaInt) = strtoul(line + strlen(META_DATA), &endptr, 10);
-			if(endptr == line){
-				fatal("Bad metaInt number");
+			read_write(response, STDOUT_FILENO, buff, metaInt % BUFF_SIZE);
+
+			if (fread(&buff, 1, 1, response) != 1) {
+				fatal("Cannot read meta size byte");
 			}
+			char size = buff[0];
+			read_write(response, STDERR_FILENO, buff, size * 16);
 		}
-		//cerr << line;
 	}
-
-	// server does not support metaData
-	if((*meta) == "1" && (*metaInt) == 0){
-		(*meta) = "0";
+	if (close(sockA) < 0) {
+		syserr("closing stream socket");
 	}
-
-	// end of header
-	if(strcmp(line, "\r\n") != 0){
-		fatal("While reading header getline error");
-	}
-	free(line);
+	exit (0);
 }
 
 int main(int argc, char* argv[]) {
 
+	int sockA;
 	string host, resource, portA, meta = "0", portB, multi;
 	unsigned long int timeoutA = 5, timeoutB = 5;
-
+	finishA = false;
+	finishB = false;
 	set_args(argc, argv, &host, &resource, &portA, &meta, &timeoutA, &portB,
 		&multi, &timeoutB);
 
@@ -153,36 +77,65 @@ int main(int argc, char* argv[]) {
 		+ "Connection: close\r\n\r\n";
 
 	// setting global sock
-	get_socket(host.c_str(), portA.c_str());
+	sockA = get_socket(host.c_str(), portA.c_str());
 	struct timeval timeout;
 	timeout.tv_sec = timeoutA;
 	timeout.tv_usec = 0;
-	if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (void *)&timeout, sizeof(timeout)) < 0)
+	// setting timeout option on socket
+	if (setsockopt(sockA, SOL_SOCKET, SO_RCVTIMEO, (void *)&timeout, sizeof(timeout)) < 0)
 		syserr("setsockopt failed");
 
 	// catch signal
-	signal(SIGINT, sigint_handler);
+	signal(SIGINT, sigint_handlerA);
 
 	// send request
 	long size_send = buffer_send.size();
-	if (write(sock, buffer_send.c_str(), size_send) != size_send) {
+	if (write(sockA, buffer_send.c_str(), size_send) != size_send) {
 		syserr("partial / failed write");
 	}
 
 	// receiving stream turned into a file
 	FILE *response;
-	response = fdopen(sock, "rb");
+	response = fdopen(sockA, "rb");
 	if(response == nullptr){
+		close(sockA);
 		fatal("Cannot open socekt as file");
 	}
 
 	// read header set metaInt
 	unsigned long int metaInt;
-	read_header(response, &meta, &metaInt);
+	read_header(response, &meta, &metaInt, sockA);
 
 	if(portB.empty()){
-		print_cout_cerr(response, meta, metaInt);
+		// Part A
+		print_cout_cerr(response, meta, metaInt, sockA);
 	}
+
+	// Part B
+	// initiate pollfd for receiving message and sending data
+	struct pollfd receiver;
+	struct sockaddr_in server;
+
+	// get socket for receiver (PF_INET = IPv4)
+	receiver.fd = socket(AF_INET, SOCK_DGRAM, 0);
+	receiver.events = POLL_IN;
+	receiver.revents = 0;
+	if (receiver.fd == -1){
+		syserr("Opening stream socket");
+	}
+
+	// bind socket to receive from port
+	server.sin_family = AF_INET;
+	server.sin_addr.s_addr = htonl(INADDR_ANY);
+	server.sin_port = htons(stoi(portB));;
+	if (bind(receiver.fd, (struct sockaddr*)&server,
+			 (socklen_t)sizeof(server)) == -1){
+		syserr("Binding stream socket");
+	}
+
+	// chyba to jedno styka
+
+
 
 
 	return 0;
