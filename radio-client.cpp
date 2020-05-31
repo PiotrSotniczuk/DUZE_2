@@ -13,6 +13,15 @@
 #define ESSEN_H 0
 #define ESSEN_PB 1
 #define ESSEN_PC 2
+
+#define HEAD_SIZE 4
+
+#define DISCOVER 1
+#define IAM 2
+#define KEEPALIVE 3
+#define AUDIO 4
+#define METADATA 6
+
 #define BUFFER_SIZE 1000
 
 using namespace std;
@@ -70,7 +79,7 @@ int main(int argc, char *argv[]) {
 	unsigned long timeout;
 	set_args_client(argc, argv, &host, &portB, &portC, &timeout);
 
-	int sock;
+	int sockB;
 	struct addrinfo addr_hints;
 	struct addrinfo *addr_result;
 
@@ -100,55 +109,30 @@ int main(int argc, char *argv[]) {
 			((struct sockaddr_in*) (addr_result->ai_addr))->sin_addr.s_addr; // address IP
 	my_address.sin_port = htons((uint16_t) stoi(portB)); // port from the command line
 
-	sock = socket(PF_INET, SOCK_DGRAM, 0);
-	if (sock < 0){
+	sockB = socket(PF_INET, SOCK_DGRAM, 0);
+	if (sockB < 0){
 		syserr("socket");
 	}
-	if(connect(sock, addr_result->ai_addr, addr_result->ai_addrlen) < 0){
-		syserr("connect");
-	}
-
-
 
 	freeaddrinfo(addr_result);
 
 
+	short communicat[BUFFER_SIZE];
+	memset(communicat, 0, BUFFER_SIZE);
+	communicat[0] = htons(DISCOVER);
 
-
-
-
-	int k = 100;
-	char napis[k+1];
-	napis[k] = '\0';
-	memset(napis, '^', k);
-
-	cout << "printing: " <<  napis << "\n";
+	cout << "printing: " <<  communicat[0]<< "\n";
 	sflags = 0;
 	rcva_len = (socklen_t) sizeof(my_address);
-	snd_len = sendto(sock, napis, k+1, sflags,
+
+	snd_len = sendto(sockB, communicat, HEAD_SIZE, sflags,
 			(struct sockaddr *) &my_address, rcva_len);
-	if (snd_len != (ssize_t) (k+1)) {
+	if (snd_len != (ssize_t) (HEAD_SIZE)) {
 		syserr("partial / failed write");
 	}
-	if(write(sock, napis, k+1) != k+1){
-		cout << "WTF";
-	}
+
 	cout << "wyslalem\n";
-
-	/*(void) memset(napis, 0, sizeof(napis));
-	int flags = 0;
-	size_t len = (size_t) sizeof(napis);
-	rcva_len = (socklen_t) sizeof(srvr_address);
-	rcv_len = recvfrom(sock, napis, len, flags,
-					   (struct sockaddr *) &srvr_address, &rcva_len);
-
-	if (rcv_len < 0) {
-		syserr("read");
-	}
-	(void) printf("read from socket: %zd bytes: %s\n", rcv_len, napis);
-	*/
-	sleep(10);
-	 if (close(sock) == -1) { //very rare errors can occur here, but then
+	 if (close(sockB) == -1) { //very rare errors can occur here, but then
 		syserr("close"); //it's healthy to do the check
 	}
 

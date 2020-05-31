@@ -6,6 +6,7 @@
 #include <sys/socket.h>
 #include <string>
 #include <unistd.h>
+#include <iostream>
 
 
 #define ESSENTIALS_SUM 3
@@ -153,6 +154,7 @@ void read_header(FILE *response, string *meta, unsigned long int *metaInt,
 
 	//cerr << line;
 	//read header
+
 	(*metaInt) = 0;
 	while(getline(&line, &line_size, response) > 2){ //break if only \r\n
 		if(strncasecmp(line, META_DATA, strlen(META_DATA)) == 0){
@@ -165,7 +167,8 @@ void read_header(FILE *response, string *meta, unsigned long int *metaInt,
 				fatal("Bad metaInt number");
 			}
 		}
-		//cerr << line;
+		// TODO
+		cerr << line;
 	}
 
 	// server does not support metaData
