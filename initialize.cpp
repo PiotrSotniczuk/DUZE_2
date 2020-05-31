@@ -20,7 +20,7 @@
 
 using namespace std;
 
-void checkEssen(bool *essentials, int nr_essen){
+static void checkEssen(bool *essentials, int nr_essen){
 	if(essentials[nr_essen]){
 		fatal("Double set of argument");
 	}
@@ -31,7 +31,7 @@ void set_args(int argc, char** argv, string *host, string *resource,
 	string *portA, string *meta, unsigned long int *timeoutA, string *portB,
 	string *multi, unsigned long int *timeoutB){
 	bool essentials[ESSENTIALS_SUM];
-	if(argc < ESSENTIALS_SUM*2 + 1){
+	if(argc < ESSENTIALS_SUM*2 + 1 || argc % 2 != 1){
 		fatal("Bad number of args");
 	}
 

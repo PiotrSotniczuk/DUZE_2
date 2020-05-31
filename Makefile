@@ -1,4 +1,4 @@
-EXECS = radio-proxy
+EXECS = radio-proxy radio-client
 
 CXX = g++
 CPPFLAGS = -Wall -Wextra -O2 -std=c++17
@@ -7,10 +7,14 @@ LDLIBS =
 
 TARGET: $(EXECS)
 
-radio-proxy.o err.o parse_args.o: err.h
+radio-proxy.o err.o parse_args.o radio-client.o: err.h
 
-radio-proxy: radio-proxy.o err.o parse_args.o
-	$(CXX) $(CPPFLAGS) radio-proxy.o err.o parse_args.o -o $(EXECS)
+radio-proxy: radio-proxy.o err.o initialize.o
+	$(CXX) $(CPPFLAGS) radio-proxy.o err.o initialize.o -o radio-proxy
+
+radio-client: radio-client.o err.o
+	$(CXX) $(CPPFLAGS) radio-client.o err.o -o radio-client
+
 
 .PHONY: clean TARGET
 clean:
