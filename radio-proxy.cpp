@@ -34,7 +34,7 @@ void sigint_handlerA([[maybe_unused]]int signal_num){
 	finishB = true;
 }
 
-void read_write(FILE* response, int sockA, int descriptor, char *buff, unsigned int size,
+void read_write(int sockA, int descriptor, char *buff, unsigned int size,
 	unsigned long timeoutA){
 	fd_set set;
 	struct timeval time_struct;
@@ -46,19 +46,22 @@ void read_write(FILE* response, int sockA, int descriptor, char *buff, unsigned 
 	while(size > 0 && !finishA) {
 		int rv = select(sockA + 1, &set, nullptr, nullptr, &time_struct);
 		if(rv == -1) {
-			if(fclose(response) < 0){
+			if(close(sockA) < 0){
 				fatal("select and close");
+			}
+			if(finishA){
+				exit(0);
 			}
 			fatal("select");
 		} else {
 			if (rv == 0){
-				if(fclose(response) < 0){
+				if(close(sockA) < 0){
 					fatal("timeout and close");
 				}
 				fatal("radio server timeout"); /* a timeout occured */
 			}else{
 				unsigned int act = 0;
-				if ((act = fread(buff, 1, size, response)) < 0) {
+				if ((act = read(sockA, buff, size)) < 0) {
 					fatal("reading from sockA");
 				}
 				if (write(descriptor, buff, act) != act) {
@@ -72,27 +75,27 @@ void read_write(FILE* response, int sockA, int descriptor, char *buff, unsigned 
 	}
 }
 
-void print_cout_cerr(FILE *response, const string& meta,
+void print_cout_cerr(const string& meta,
 	unsigned long int metaInt, int sockA, unsigned long timeoutA){
 	char buff[MAX_META_SIZE];
 
 	if(meta == "0"){
 		while(!finishA){
-			read_write(response, sockA, STDOUT_FILENO, buff, MAX_META_SIZE, timeoutA);
+			read_write(sockA, STDOUT_FILENO, buff, MAX_META_SIZE, timeoutA);
 		}
 	}else {
 		unsigned long int n = metaInt / MAX_META_SIZE;
 		while (!finishA) {
 			for (unsigned int i = 0; i < n; i++) {
-				read_write(response, sockA, STDOUT_FILENO, buff, MAX_META_SIZE, timeoutA);
+				read_write(sockA, STDOUT_FILENO, buff, MAX_META_SIZE, timeoutA);
 			}
-			read_write(response, sockA, STDOUT_FILENO, buff, metaInt % MAX_META_SIZE, timeoutA);
+			read_write(sockA, STDOUT_FILENO, buff, metaInt % MAX_META_SIZE, timeoutA);
 
-			if (fread(&buff, 1, 1, response) != 1) {
+			if (read(sockA, buff, 1) != 1) {
 				fatal("Cannot read meta size byte");
 			}
 			char size = buff[0];
-			read_write(response, sockA, STDERR_FILENO, buff, size * 16, timeoutA);
+			read_write(sockA, STDERR_FILENO, buff, size * 16, timeoutA);
 		}
 	}
 	if (close(sockA) < 0) {
@@ -124,12 +127,6 @@ int main(int argc, char* argv[]) {
 
 	// setting global sock
 	sockA = get_socket(host.c_str(), portA.c_str());
-	/*struct timeval timeout;
-	timeout.tv_sec = timeoutA;
-	timeout.tv_usec = 0;
-	// setting timeout option on socket
-	if (setsockopt(sockA, SOL_SOCKET, SO_RCVTIMEO, (void *)&timeout, sizeof(timeout)) < 0)
-		syserr("setsockopt failed");*/
 
 	// catch signal
 	signal(SIGINT, sigint_handlerA);
@@ -140,22 +137,14 @@ int main(int argc, char* argv[]) {
 		syserr("partial / failed write");
 	}
 
-	// receiving stream turned into a file
-	FILE *response;
-	response = fdopen(sockA, "rb");
-	if(response == nullptr){
-		close(sockA);
-		fatal("Cannot open socekt as file");
-	}
-
 	// read header set metaInt
 	unsigned long int metaInt;
 	// TODO catch name or something
-	read_header(response, &meta, &metaInt, sockA);
+	read_header(&meta, &metaInt, sockA);
 
 	if(portB.empty()){
 		// Part A
-		print_cout_cerr(response, meta, metaInt, sockA, timeoutA);
+		print_cout_cerr(meta, metaInt, sockA, timeoutA);
 	}
 
 	// Part B

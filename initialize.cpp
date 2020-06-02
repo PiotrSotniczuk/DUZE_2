@@ -131,15 +131,30 @@ int get_socket(const char *connect_adr, const char *port){
 	return sock;
 }
 
-void read_header(FILE *response, string *meta, unsigned long int *metaInt,
+int my_getline(int sockA, char* line, unsigned  long line_size){
+	char c = 0;
+	int sum = 0;
+	while(c != '\n'){
+		if(read(sockA, &c, 1) <= 0){
+			syserr("reading header");
+		}
+		line[sum] = c;
+		sum++;
+	}
+	line[sum] = 0;
+	return sum;
+}
+
+void read_header(string *meta, unsigned long int *metaInt,
 	int sockA){
 	unsigned long line_size = BUFF_SIZE;
 	char* line = static_cast<char *>(malloc(line_size * sizeof(char)));
+	memset(line, 0, BUFF_SIZE);
 	if(line == nullptr){
 		fatal("Cannot alloc memory");
 	}
 
-	if(getline(&line, &line_size, response) <= 0){
+	if(my_getline(sockA, line, line_size) <= 0){
 		fatal("Cannot read from file or no response from server");
 	}
 
@@ -156,7 +171,7 @@ void read_header(FILE *response, string *meta, unsigned long int *metaInt,
 	//read header
 
 	(*metaInt) = 0;
-	while(getline(&line, &line_size, response) > 2){ //break if only \r\n
+	while(my_getline(sockA, line, line_size) > 2){ //break if only \r\n
 		if(strncasecmp(line, META_DATA, strlen(META_DATA)) == 0){
 			if((*meta) == "0"){
 				fatal("Radio sends unwanted metadata");
@@ -168,7 +183,7 @@ void read_header(FILE *response, string *meta, unsigned long int *metaInt,
 			}
 		}
 		// TODO
-		cerr << line;
+		// cerr << string(line);
 	}
 
 	// server does not support metaData

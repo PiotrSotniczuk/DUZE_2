@@ -12,7 +12,7 @@ void set_args(int argc, char** argv, std::string *host, std::string *resource,
 int get_socket(const char *connect_adr, const char *port);
 
 //
-void read_header(FILE *response, std::string *meta, unsigned long int *metaInt,
+void read_header(std::string *meta, unsigned long int *metaInt,
 				 int sockA);
 
 #endif //DUZE_2__INITIALIZE_H_
