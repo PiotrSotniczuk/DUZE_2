@@ -7,10 +7,10 @@ LDLIBS =
 
 TARGET: $(EXECS)
 
-radio-proxy.o err.o parse_args.o radio-client.o: err.h
+radio-proxy.o err.o parse_args.o radio-client.o RadioReader.o: err.h
 
-radio-proxy: radio-proxy.o err.o initialize.o
-	$(CXX) $(CPPFLAGS) radio-proxy.o err.o initialize.o -o radio-proxy
+radio-proxy: radio-proxy.o err.o initialize.o RadioReader.o
+	$(CXX) $(CPPFLAGS) radio-proxy.o err.o initialize.o RadioReader.o -o radio-proxy
 
 radio-client: radio-client.o err.o
 	$(CXX) $(CPPFLAGS) radio-client.o err.o -o radio-client

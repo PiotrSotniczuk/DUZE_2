@@ -9,6 +9,7 @@
 #include <netdb.h>
 #include <iostream>
 #include <set>
+#include "RadioReader.h"
 
 #define DISCOVER 1
 #define IAM 2
@@ -27,92 +28,37 @@ static bool finishA;
 static bool finishB;
 
 
-
-
 void sigint_handlerA([[maybe_unused]]int signal_num){
 	finishA = true;
 	finishB = true;
 }
 
-void read_write(int sockA, int descriptor, char *buff, unsigned int size,
-	unsigned long timeoutA){
-	fd_set set;
-	struct timeval time_struct;
-	time_struct.tv_sec = timeoutA;
-	time_struct.tv_usec = 0;
-	FD_ZERO(&set); /* clear the set */
-	FD_SET(sockA, &set); /* add our file descriptor to the set */
-
-	while(size > 0 && !finishA) {
-		int rv = select(sockA + 1, &set, nullptr, nullptr, &time_struct);
-		if(rv == -1) {
-			if(close(sockA) < 0){
-				fatal("select and close");
-			}
-			if(finishA){
-				exit(0);
-			}
-			fatal("select");
-		} else {
-			if (rv == 0){
-				if(close(sockA) < 0){
-					fatal("timeout and close");
-				}
-				fatal("radio server timeout"); /* a timeout occured */
-			}else{
-				unsigned int act = 0;
-				if ((act = read(sockA, buff, size)) < 0) {
-					fatal("reading from sockA");
-				}
-				if (write(descriptor, buff, act) != act) {
-					fatal("writing to stream");
-				}
-				size -= act;
-			}
-		}
-		time_struct.tv_sec = timeoutA;
-		time_struct.tv_usec = 0;
-	}
-	if(finishA){
-		close(sockA);
-		exit(0);
-	}
-}
-
 void print_cout_cerr(const string& meta,
-	unsigned long int metaInt, int sockA, unsigned long timeoutA){
-	char buff[MAX_META_SIZE];
+	unsigned long int metaInt, int sockA){
 
+	bool metaBool;
 	if(meta == "0"){
-		while(!finishA){
-			read_write(sockA, STDOUT_FILENO, buff, MAX_META_SIZE, timeoutA);
-		}
+		metaBool = false;
+		metaInt = 0;
 	}else {
-		unsigned long int n = metaInt / MAX_META_SIZE;
-		while (!finishA) {
-			for (unsigned int i = 0; i < n; i++) {
-				read_write(sockA, STDOUT_FILENO, buff, MAX_META_SIZE, timeoutA);
-			}
-			read_write(sockA, STDOUT_FILENO, buff, metaInt % MAX_META_SIZE, timeoutA);
-
-			if (read(sockA, buff, 1) != 1) {
-				fatal("Cannot read meta size byte");
-			}
-			char size = buff[0];
-			read_write(sockA, STDERR_FILENO, buff, size * 16, timeoutA);
-		}
+		metaBool = true;
 	}
+
+	RadioReader reader(metaBool, metaInt, sockA, true);
+
+	while (!finishA && reader.readSendChunk(nullptr) > 0){}
+
 	if (close(sockA) < 0) {
 		syserr("closing stream socket");
 	}
-	exit (0);
+	if(finishA){
+		exit(0);
+	} else{
+		// readSendChunkError
+		exit(1);
+	}
 }
 
-struct addr_comp {
-	bool operator() (const struct sockaddr_in lhs, const struct sockaddr_in rhs) const {
-		return lhs.sin_addr.s_addr < rhs.sin_addr.s_addr;
-	}
-};
 
 int main(int argc, char* argv[]) {
 
