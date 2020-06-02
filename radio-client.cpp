@@ -117,11 +117,13 @@ int main(int argc, char *argv[]) {
 	freeaddrinfo(addr_result);
 
 
-	short communicat[BUFFER_SIZE];
-	memset(communicat, 0, BUFFER_SIZE);
+	unsigned short communicat[HEAD_SIZE];
+	memset(communicat, 0, HEAD_SIZE);
 	communicat[0] = htons(DISCOVER);
+	communicat[1] = htons(0);
 
-	cout << "printing: " <<  communicat[0]<< "\n";
+	cout << "send: " <<  communicat[0]  <<
+	" =ntohs"<< ntohs(communicat[0])<< "\n";
 	sflags = 0;
 	rcva_len = (socklen_t) sizeof(my_address);
 
@@ -131,7 +133,15 @@ int main(int argc, char *argv[]) {
 		syserr("partial / failed write");
 	}
 
-	cout << "wyslalem\n";
+	char buf[BUFFER_SIZE];
+	memset(buf, 0, BUFFER_SIZE);
+	recvfrom(sockB, communicat, 4, 0, NULL, NULL);
+	cout << "\n" <<communicat[0] << "------" << communicat[1] << "\n";
+	int type = ntohs(communicat[0]);
+	int size_rc = ntohs(communicat[1]);
+	cout << "received" << type << "\n" << size_rc <<"\n";
+
+
 	 if (close(sockB) == -1) { //very rare errors can occur here, but then
 		syserr("close"); //it's healthy to do the check
 	}

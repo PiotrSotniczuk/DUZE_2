@@ -30,7 +30,7 @@ static void checkEssen(bool *essentials, int nr_essen){
 }
 
 void set_args(int argc, char** argv, string *host, string *resource,
-	string *portA, string *meta, int *timeoutA, string *portB,
+	string *portA, bool *metaData, int *timeoutA, string *portB,
 	string *multi, int *timeoutB){
 	bool essentials[ESSENTIALS_SUM];
 	if(argc < ESSENTIALS_SUM*2 + 1 || argc % 2 != 1){
@@ -56,10 +56,10 @@ void set_args(int argc, char** argv, string *host, string *resource,
 
 		if(strcmp(argv[i], "-m") == 0){
 			if(strcmp(argv[i+1], "yes") == 0){
-				(*meta) = "1";
+				(*metaData) = true;
 			}else{
 				if(strcmp(argv[i+1], "no") == 0){
-					(*meta) = "0";
+					(*metaData) = false;
 				}else{
 					fatal("Argument -m is not yes|no");
 				}
@@ -138,7 +138,7 @@ int my_getline(int sockA, char* line){
 	return sum;
 }
 
-void read_header(string *meta, string *name, int *metaInt,
+void read_header(bool *metaData, string *name, int *metaInt,
 	int sockA){
 	char* line = static_cast<char *>(malloc(BUFF_SIZE * sizeof(char)));
 	memset(line, 0, BUFF_SIZE);
@@ -159,13 +159,13 @@ void read_header(string *meta, string *name, int *metaInt,
 		fatal("Status line");
 	}
 
-	cerr << line;
+	//cerr << line;
 	//read header
 
 	(*metaInt) = 0;
 	while(my_getline(sockA, line) > 2){ //break if only \r\n
 		if(strncasecmp(line, META_DATA, strlen(META_DATA)) == 0){
-			if((*meta) == "0"){
+			if(!*metaData){
 				fatal("Radio sends unwanted metadata");
 			}
 			(*metaInt) = stoi(string(line + strlen(META_DATA)));
@@ -176,12 +176,12 @@ void read_header(string *meta, string *name, int *metaInt,
 			(*name) = string(str).substr(0, strlen(str) - 2);
 		}
 		// TODO
-		 cerr << string(line);
+		// cerr << string(line);
 	}
 
 	// server does not support metaData
-	if((*meta) == "1" && (*metaInt) == 0){
-		(*meta) = "0";
+	if((*metaData) && (*metaInt) == 0){
+		(*metaData) = false;
 	}
 
 	// end of header
@@ -206,6 +206,7 @@ void init_poll(int sockA, const string& portB, struct pollfd *poll_tab,
 	(*server).sin_family = AF_INET;
 	(*server).sin_addr.s_addr = htonl(INADDR_ANY);
 	(*server).sin_port = htons(stoi(portB));
+	// TODO
 	cout << "portB " << stoi(portB) << "\n";
 	if (bind(poll_tab[0].fd, (struct sockaddr*)&(*server),
 			 (socklen_t)sizeof((*server))) < 0){
