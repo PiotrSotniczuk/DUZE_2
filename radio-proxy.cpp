@@ -28,13 +28,13 @@ static bool finishA;
 static bool finishB;
 
 
-void sigint_handlerA([[maybe_unused]]int signal_num){
+void sigint_handler([[maybe_unused]]int signal_num){
 	finishA = true;
 	finishB = true;
 }
 
 void print_cout_cerr(const string& meta,
-	unsigned long int metaInt, int sockA){
+	unsigned long int metaInt, int sockA, int timeoutA){
 
 	bool metaBool;
 	if(meta == "0"){
@@ -46,7 +46,18 @@ void print_cout_cerr(const string& meta,
 
 	RadioReader reader(metaBool, metaInt, sockA, true);
 
-	while (!finishA && reader.readSendChunk(nullptr) > 0){}
+	pollfd poll_tab[1];
+	poll_tab[0].fd = sockA;
+	poll_tab[0].events = POLLIN;
+	poll_tab[0].revents = 0;
+
+	while (!finishA){
+		int ret = poll(poll_tab, 1, timeoutA * 1000);
+		// error in poll or timeout exceeded or error in RadioReader
+		if(ret <= 0 || reader.readSendChunk(nullptr) < 0){
+			break;
+		}
+	}
 
 	if (close(sockA) < 0) {
 		syserr("closing stream socket");
@@ -54,7 +65,6 @@ void print_cout_cerr(const string& meta,
 	if(finishA){
 		exit(0);
 	} else{
-		// readSendChunkError
 		exit(1);
 	}
 }
@@ -63,8 +73,8 @@ void print_cout_cerr(const string& meta,
 int main(int argc, char* argv[]) {
 
 	int sockA;
-	string host, resource, portA, meta = "0", portB, multi, name = "";
-	unsigned long int timeoutA = 5, timeoutB = 5;
+	string host, resource, portA, meta = "0", portB, multi, name;
+	int timeoutA = 5, timeoutB = 5;
 	finishA = false;
 	finishB = false;
 	set_args(argc, argv, &host, &resource, &portA, &meta, &timeoutA, &portB,
@@ -79,7 +89,7 @@ int main(int argc, char* argv[]) {
 	sockA = get_socket(host.c_str(), portA.c_str());
 
 	// catch signal
-	signal(SIGINT, sigint_handlerA);
+	signal(SIGINT, sigint_handler);
 
 	// send request
 	long size_send = buffer_send.size();
@@ -88,8 +98,7 @@ int main(int argc, char* argv[]) {
 	}
 
 	// read header set metaInt
-	unsigned long int metaInt;
-	// TODO catch name or something
+	int metaInt;
 	read_header(&meta, &name, &metaInt, sockA);
 
 	if(portB.empty()){
@@ -107,8 +116,7 @@ int main(int argc, char* argv[]) {
 
 	set<struct sockaddr_in, addr_comp> clients_list = {};
 	struct sockaddr_in client_address;
-	socklen_t snda_len = (socklen_t) sizeof(client_address);
-	socklen_t rcva_len = (socklen_t) sizeof(client_address);
+	auto rcva_len = (socklen_t) sizeof(client_address);
 
 	short buf[BUFF_SIZE];
 	while(!finishB) {

@@ -30,8 +30,8 @@ static void checkEssen(bool *essentials, int nr_essen){
 }
 
 void set_args(int argc, char** argv, string *host, string *resource,
-	string *portA, string *meta, unsigned long int *timeoutA, string *portB,
-	string *multi, unsigned long int *timeoutB){
+	string *portA, string *meta, int *timeoutA, string *portB,
+	string *multi, int *timeoutB){
 	bool essentials[ESSENTIALS_SUM];
 	if(argc < ESSENTIALS_SUM*2 + 1 || argc % 2 != 1){
 		fatal("Bad number of args");
@@ -67,11 +67,7 @@ void set_args(int argc, char** argv, string *host, string *resource,
 		}
 
 		if(strcmp(argv[i], "-t") == 0){
-			char *endptr;
-			(*timeoutA) = strtoul(argv[i+1], &endptr, 10);
-			if(endptr == argv[i+1]){
-				fatal("Argument -t bad timeout");
-			}
+			(*timeoutA) = stoi(string(argv[i+1]));
 		}
 
 		if(strcmp(argv[i], "-P") == 0){
@@ -83,11 +79,7 @@ void set_args(int argc, char** argv, string *host, string *resource,
 		}
 
 		if(strcmp(argv[i], "-T") == 0){
-			char *endptr;
-			(*timeoutB) = strtoul(argv[i+1], &endptr, 10);
-			if(endptr == argv[i+1]){
-				fatal("Argument -T bad timeout");
-			}
+			(*timeoutB) = stoi(string(argv[i+1]));
 		}
 	}
 
@@ -132,7 +124,7 @@ int get_socket(const char *connect_adr, const char *port){
 	return sock;
 }
 
-int my_getline(int sockA, char* line, unsigned  long line_size){
+int my_getline(int sockA, char* line){
 	char c = 0;
 	int sum = 0;
 	while(c != '\n'){
@@ -146,16 +138,15 @@ int my_getline(int sockA, char* line, unsigned  long line_size){
 	return sum;
 }
 
-void read_header(string *meta, string *name, unsigned long int *metaInt,
+void read_header(string *meta, string *name, int *metaInt,
 	int sockA){
-	unsigned long line_size = BUFF_SIZE;
-	char* line = static_cast<char *>(malloc(line_size * sizeof(char)));
+	char* line = static_cast<char *>(malloc(BUFF_SIZE * sizeof(char)));
 	memset(line, 0, BUFF_SIZE);
 	if(line == nullptr){
 		fatal("Cannot alloc memory");
 	}
 
-	if(my_getline(sockA, line, line_size) <= 0){
+	if(my_getline(sockA, line) <= 0){
 		fatal("Cannot read from file or no response from server");
 	}
 
@@ -172,16 +163,12 @@ void read_header(string *meta, string *name, unsigned long int *metaInt,
 	//read header
 
 	(*metaInt) = 0;
-	while(my_getline(sockA, line, line_size) > 2){ //break if only \r\n
+	while(my_getline(sockA, line) > 2){ //break if only \r\n
 		if(strncasecmp(line, META_DATA, strlen(META_DATA)) == 0){
 			if((*meta) == "0"){
 				fatal("Radio sends unwanted metadata");
 			}
-			char *endptr;
-			(*metaInt) = strtoul(line + strlen(META_DATA), &endptr, 10);
-			if(endptr == line){
-				fatal("Bad metaInt number");
-			}
+			(*metaInt) = stoi(string(line + strlen(META_DATA)));
 		}
 
 		if(strncasecmp(line, ICY_NAME, strlen(ICY_NAME)) == 0){
@@ -204,7 +191,7 @@ void read_header(string *meta, string *name, unsigned long int *metaInt,
 	free(line);
 }
 
-void init_poll(int sockA, string portB, struct pollfd *poll_tab,
+void init_poll(int sockA, const string& portB, struct pollfd *poll_tab,
 	struct sockaddr_in *server){
 
 	// get socket for poll_tab[0] (PF_INET = IPv4)

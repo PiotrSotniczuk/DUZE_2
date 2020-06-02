@@ -8,9 +8,9 @@ using namespace std;
 int RadioReader::readSendChunk(set<struct sockaddr_in,
 	addr_comp> *clients_list){
 	if(meta){
-		return readSendMeta(*clients_list);
+		return readSendMeta(clients_list);
 	}else{
-		return readSendNoMeta(*clients_list);
+		return readSendNoMeta(clients_list);
 	}
 }
 
@@ -25,7 +25,7 @@ int RadioReader::readSendNoMeta(set<struct sockaddr_in,
 		rv = write(STDOUT_FILENO, buff, size);
 	}else{
 		// TODO zakoduj wysylanie
-		for(sockaddr_in clients : clients_list){
+		for(sockaddr_in clients : (*clients_list)){
 			cout << "WYSYLAM COS NO META\n";
 		}
 	}
@@ -47,7 +47,7 @@ int RadioReader::readSendMeta(set<struct sockaddr_in,
 	if(to_cout){
 		rv = write(STDOUT_FILENO, buff, size);
 	}else{
-		for(sockaddr_in clients : clients_list){
+		for(sockaddr_in clients : (*clients_list)){
 			cout << "WYSYLAM COS META\n";
 		}
 	}
@@ -89,7 +89,7 @@ int RadioReader::readMeta(set<struct sockaddr_in,
 				return -1;
 			}
 		}else{
-			for(sockaddr_in clients : clients_list){
+			for(sockaddr_in clients : (*clients_list)){
 				cout << "WYSYLAM COS MET STDERRA\n";
 			}
 		}
