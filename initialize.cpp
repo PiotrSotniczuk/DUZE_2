@@ -7,7 +7,7 @@
 #include <string>
 #include <unistd.h>
 #include <iostream>
-
+#include <poll.h>
 
 #define ESSENTIALS_SUM 3
 #define ESSEN_H 0
@@ -18,6 +18,7 @@
 #define HTTP_1 "HTTP/1.1 200 OK\r\n"
 #define ICY "ICY 200 OK\r\n"
 #define META_DATA "icy-metaint:"
+#define ICY_NAME "icy-name:"
 
 using namespace std;
 
@@ -145,7 +146,7 @@ int my_getline(int sockA, char* line, unsigned  long line_size){
 	return sum;
 }
 
-void read_header(string *meta, unsigned long int *metaInt,
+void read_header(string *meta, string *name, unsigned long int *metaInt,
 	int sockA){
 	unsigned long line_size = BUFF_SIZE;
 	char* line = static_cast<char *>(malloc(line_size * sizeof(char)));
@@ -167,7 +168,7 @@ void read_header(string *meta, unsigned long int *metaInt,
 		fatal("Status line");
 	}
 
-	//cerr << line;
+	cerr << line;
 	//read header
 
 	(*metaInt) = 0;
@@ -182,8 +183,13 @@ void read_header(string *meta, unsigned long int *metaInt,
 				fatal("Bad metaInt number");
 			}
 		}
+
+		if(strncasecmp(line, ICY_NAME, strlen(ICY_NAME)) == 0){
+			char *str = line + strlen(ICY_NAME);
+			(*name) = string(str).substr(0, strlen(str) - 2);
+		}
 		// TODO
-		// cerr << string(line);
+		 cerr << string(line);
 	}
 
 	// server does not support metaData
@@ -196,4 +202,30 @@ void read_header(string *meta, unsigned long int *metaInt,
 		fatal("While reading header getline error");
 	}
 	free(line);
+}
+
+void init_poll(int sockA, string portB, struct pollfd *poll_tab,
+	struct sockaddr_in *server){
+
+	// get socket for poll_tab[0] (PF_INET = IPv4)
+	poll_tab[0].fd = socket(AF_INET, SOCK_DGRAM, 0);
+	poll_tab[0].events = POLLIN;
+	poll_tab[0].revents = 0;
+	if (poll_tab[0].fd == -1){
+		syserr("Opening stream socket");
+	}
+
+	// bind socket to receive from port
+	(*server).sin_family = AF_INET;
+	(*server).sin_addr.s_addr = htonl(INADDR_ANY);
+	(*server).sin_port = htons(stoi(portB));
+	cout << "portB " << stoi(portB) << "\n";
+	if (bind(poll_tab[0].fd, (struct sockaddr*)&(*server),
+			 (socklen_t)sizeof((*server))) < 0){
+		syserr("Binding stream socket");
+	}
+
+	poll_tab[1].fd = sockA;
+	poll_tab[1].events = POLLIN;
+	poll_tab[1].revents = 0;
 }

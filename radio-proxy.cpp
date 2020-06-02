@@ -73,6 +73,10 @@ void read_write(int sockA, int descriptor, char *buff, unsigned int size,
 		time_struct.tv_sec = timeoutA;
 		time_struct.tv_usec = 0;
 	}
+	if(finishA){
+		close(sockA);
+		exit(0);
+	}
 }
 
 void print_cout_cerr(const string& meta,
@@ -113,7 +117,7 @@ struct addr_comp {
 int main(int argc, char* argv[]) {
 
 	int sockA;
-	string host, resource, portA, meta = "0", portB, multi;
+	string host, resource, portA, meta = "0", portB, multi, name = "";
 	unsigned long int timeoutA = 5, timeoutB = 5;
 	finishA = false;
 	finishB = false;
@@ -140,7 +144,7 @@ int main(int argc, char* argv[]) {
 	// read header set metaInt
 	unsigned long int metaInt;
 	// TODO catch name or something
-	read_header(&meta, &metaInt, sockA);
+	read_header(&meta, &name, &metaInt, sockA);
 
 	if(portB.empty()){
 		// Part A
@@ -150,45 +154,36 @@ int main(int argc, char* argv[]) {
 	// Part B
 	// initiate pollfd for receiving message
 	struct sockaddr_in server;
-	struct pollfd poll_tab[1];
+	struct pollfd poll_tab[2];
 
-	// get socket for poll_tab[0] (PF_INET = IPv4)
-	poll_tab[0].fd = socket(AF_INET, SOCK_DGRAM, 0);
-	poll_tab[0].events = POLL_IN;
-	poll_tab[0].revents = 0;
-	if (poll_tab[0].fd == -1){
-		syserr("Opening stream socket");
-	}
+	init_poll(sockA, portB, poll_tab, &server);
 
-	// bind socket to receive from port
-	server.sin_family = AF_INET;
-	server.sin_addr.s_addr = htonl(INADDR_ANY);
-	server.sin_port = htons(stoi(portB));
-	cout << "portB " << stoi(portB) << "\n";
-	if (bind(poll_tab[0].fd, (struct sockaddr*)&server,
-			 (socklen_t)sizeof(server)) < 0){
-		syserr("Binding stream socket");
-	}
 
 	set<struct sockaddr_in, addr_comp> clients_list = {};
 	struct sockaddr_in client_address;
 	socklen_t snda_len = (socklen_t) sizeof(client_address);
 	socklen_t rcva_len = (socklen_t) sizeof(client_address);
+
 	short buf[BUFF_SIZE];
 	while(!finishB) {
-		int ret = poll(poll_tab, 1, 1000);
+		int ret = poll(poll_tab, 2, timeoutA * 1000);
 		if(ret == 0){
-			cout << "Nic nie zlapalem poll\n";
+			cout << "Nic nie zlapalem poll server nic nie dal LOL\n";
+			close(poll_tab[0].fd);
+			close(sockA);
+			exit(0);
 		}
 		if (ret == -1) {
-			if (errno == EINTR){
+			if (errno == EINTR) {
 				cerr << "Interrupted system call\n";
-			}else{
+			} else {
 				syserr("poll");
 			}
-		} else if (ret > 0) {
-			if (poll_tab[0].revents & (POLL_IN | POLLERR)) {
+		}
+		if (ret > 0) {
+			if (poll_tab[0].revents & (POLLIN | POLLERR)) {
 				cerr << "Tak kurna zlapalem clienta\n";
+				poll_tab[0].revents = 0;
 				int flags = 0;
 				int rval = recvfrom(poll_tab[0].fd, buf, HEAD_SIZE, flags,
 									(struct sockaddr *) &client_address, &rcva_len);
@@ -212,6 +207,13 @@ int main(int argc, char* argv[]) {
 							cout << "odd header\n";
 					}
 				}
+			}
+			if(poll_tab[1].revents & (POLLIN | POLLERR)){
+				cerr << "Tak zlapalem server radio";
+				poll_tab[1].revents = 0;
+				// TODO wczytaj czesc, i wyslij
+
+
 			}
 		}
 	}
