@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <iostream>
 #include <poll.h>
+#include <arpa/inet.h>
 
 #define ESSENTIALS_SUM 3
 #define ESSEN_H 0
@@ -92,8 +93,8 @@ void set_args(int argc, char** argv, string *host, string *resource,
 
 int get_socket(const char *connect_adr, const char *port){
 	int err;
-	struct addrinfo addr_hints;
-	struct addrinfo *addr_result;
+	struct addrinfo addr_hints{};
+	struct addrinfo *addr_result{};
 	int sock;
 
 	// 'converting' host/port in string to struct addrinfo
@@ -192,8 +193,9 @@ void read_header(bool *metaData, string *name, int *metaInt,
 }
 
 void init_poll(int sockA, const string& portB, struct pollfd *poll_tab,
-	struct sockaddr_in *server){
+	const string& multi, struct ip_mreq *ip_mreq){
 
+	struct sockaddr_in server{};
 	// get socket for poll_tab[0] (PF_INET = IPv4)
 	poll_tab[0].fd = socket(AF_INET, SOCK_DGRAM, 0);
 	poll_tab[0].events = POLLIN;
@@ -202,14 +204,28 @@ void init_poll(int sockA, const string& portB, struct pollfd *poll_tab,
 		syserr("Opening stream socket");
 	}
 
+	/* connecting to grup ( multicast) */
+	if(!multi.empty()) {
+		ip_mreq->imr_interface.s_addr = htonl(INADDR_ANY);
+		if (inet_aton(multi.c_str(), &(ip_mreq->imr_multiaddr)) == 0) {
+			fatal("inet_aton - invalid multicast address\n");
+		}
+		if (setsockopt(poll_tab[0].fd,
+					   IPPROTO_IP,
+					   IP_ADD_MEMBERSHIP,
+					   (void *) ip_mreq,
+					   sizeof (*ip_mreq)) < 0)
+			syserr("setsockopt");
+	}
+
 	// bind socket to receive from port
-	(*server).sin_family = AF_INET;
-	(*server).sin_addr.s_addr = htonl(INADDR_ANY);
-	(*server).sin_port = htons(stoi(portB));
+	server.sin_family = AF_INET;
+	server.sin_addr.s_addr = htonl(INADDR_ANY);
+	server.sin_port = htons(stoi(portB));
 	// TODO
 	// cout << "portB " << stoi(portB) << "\n";
-	if (bind(poll_tab[0].fd, (struct sockaddr*)&(*server),
-			 (socklen_t)sizeof((*server))) < 0){
+	if (bind(poll_tab[0].fd, (struct sockaddr*)&server,
+			 (socklen_t)sizeof(server)) < 0){
 		syserr("Binding stream socket");
 	}
 

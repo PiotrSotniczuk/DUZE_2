@@ -104,13 +104,13 @@ int main(int argc, char* argv[]) {
 
 	// Part B
 	// initiate pollfd for receiving message
-	struct sockaddr_in server;
 	struct pollfd poll_tab[2];
-	init_poll(sockA, portB, poll_tab, &server);
+	struct ip_mreq ip_mreq{};
+	init_poll(sockA, portB, poll_tab, multi, &ip_mreq);
 
 
 	map<struct sockaddr_in, time_point<steady_clock>, addr_comp> clients_map = {};
-	struct sockaddr_in client_address;
+	struct sockaddr_in client_address{};
 	auto rcva_len = (socklen_t) sizeof(client_address);
 
 	RadioReader reader(metaData, metaInt, sockA, false);
@@ -174,6 +174,10 @@ int main(int argc, char* argv[]) {
 		}
 
 	}
+	// disconnect from grup
+	if (setsockopt(poll_tab[0].fd, IPPROTO_IP, IP_DROP_MEMBERSHIP, (void*)&ip_mreq, sizeof ip_mreq) < 0)
+		syserr("setsockopt");
+
 	close(poll_tab[0].fd);
 	close(sockA);
 

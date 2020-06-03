@@ -10,11 +10,8 @@
 #include "err.h"
 #include <signal.h>
 #include <cassert>
-
-#define ESSENTIALS_SUM 3
-#define ESSEN_H 0
-#define ESSEN_PB 1
-#define ESSEN_PC 2
+#include <poll.h>
+#include "initialize_client.h"
 
 #define HEAD_SIZE 4
 
@@ -24,7 +21,10 @@
 #define AUDIO 4
 #define METADATA 6
 
-#define BUFFER_SIZE 10000
+//max size of message
+#define BUFFER_SIZE 66000
+
+#define BUFFER_TEL_SIZE   200
 
 bool finish;
 using namespace std;
@@ -33,102 +33,65 @@ void sigint_handler([[maybe_unused]]int signal_num){
 	finish = true;
 }
 
-static void checkEssen(bool *essentials, int nr_essen){
-	if(essentials[nr_essen]){
-		fatal("Double set of argument");
-	}
-	essentials[nr_essen] = true;
-}
-
-static void set_args_client(int argc, char** argv, string *host,
-	string *portB, string *portC, unsigned long int *timeoutA){
-	bool essentials[ESSENTIALS_SUM];
-	if(argc < ESSENTIALS_SUM*2 + 1){
-		fatal("Bad number of args");
-	}
-
-	memset(essentials, false, 3);
-	for(int i = 1; i < argc; i = i + 2){
-		if(strcmp(argv[i], "-H") == 0){
-			checkEssen(essentials, ESSEN_H);
-			(*host) = argv[i+1];
-		}
-
-		if(strcmp(argv[i], "-P") == 0){
-			checkEssen(essentials, ESSEN_PB);
-			(*portB) = argv[i+1];
-		}
-
-		if(strcmp(argv[i], "-p") == 0){
-			checkEssen(essentials, ESSEN_PC);
-			(*portC) = argv[i+1];
-		}
-
-		if(strcmp(argv[i], "-T") == 0){
-			char *endptr;
-			(*timeoutA) = strtoul(argv[i+1], &endptr, 10);
-			if(endptr == argv[i+1]){
-				fatal("Argument -t bad timeout");
-			}
-		}
-	}
-
-	for(bool essential : essentials){
-		if(!essential){
-			fatal("Missing essential argument");
-		}
-	}
-}
-
-
 int main(int argc, char *argv[]) {
 	string host, portB, portC;
-	unsigned long timeout;
+	int timeout = 5;
 	set_args_client(argc, argv, &host, &portB, &portC, &timeout);
 
 	finish = false;
 	// catch signal
 	signal(SIGINT, sigint_handler);
 
-	int sockB;
-	struct addrinfo addr_hints;
-	struct addrinfo *addr_result;
-
+	socklen_t rcva_len;
 	int sflags;
 	ssize_t snd_len, rcv_len;
-	struct sockaddr_in my_address;
-	struct sockaddr_in srvr_address;
+	struct sockaddr_in my_address{};
+	// get socket to sender
+	int sockB = get_socketB(host, portB, &my_address);
 
-	socklen_t rcva_len;
+	struct pollfd poll_tab[0];
+	init_poll_client(portC, poll_tab);
 
-	// 'converting' host/port in string to struct addrinfo
-	(void) memset(&addr_hints, 0, sizeof(struct addrinfo));
-	addr_hints.ai_family = AF_INET; // IPv4
-	addr_hints.ai_socktype = SOCK_DGRAM;
-	addr_hints.ai_protocol = IPPROTO_UDP;
-	addr_hints.ai_flags = 0;
-	addr_hints.ai_addrlen = 0;
-	addr_hints.ai_addr = NULL;
-	addr_hints.ai_canonname = NULL;
-	addr_hints.ai_next = NULL;
-	if (getaddrinfo(host.c_str(), NULL, &addr_hints, &addr_result) != 0) {
-		syserr("getaddrinfo");
+	struct sockaddr_in client_address{};
+	socklen_t client_address_len;
+	int msg_sock = accept(poll_tab[0].fd, (struct sockaddr *) &client_address, &client_address_len);
+
+	if (msg_sock < 0)
+		syserr("accept");
+
+	unsigned char do_linemode[3] = {255, 253, 34};
+	int len = 3;
+	write(msg_sock, do_linemode, len);
+	len = 7;
+	unsigned char linemode_options[7] = {255, 250, 34, 1, 0, 255, 240};
+	write(msg_sock, linemode_options, len);
+
+	//unsigned char will_echo[3] = {255, 251, 1};
+
+	char stuff[80];
+	int bw = snprintf(stuff, 80, "\x1b[0m\x1b[H\x1b[2J");
+	if (write(msg_sock, stuff, bw) == -1) {
+		perror("Unable to clear screen");
 	}
 
-	my_address.sin_family = AF_INET; // IPv4
-	my_address.sin_addr.s_addr =
-			((struct sockaddr_in*) (addr_result->ai_addr))->sin_addr.s_addr; // address IP
-	my_address.sin_port = htons((uint16_t) stoi(portB)); // port from the command line
-
-	sockB = socket(PF_INET, SOCK_DGRAM, 0);
-	if (sockB < 0){
-		syserr("socket");
-	}
-
-	freeaddrinfo(addr_result);
 
 
-	unsigned short communicat[HEAD_SIZE];
+	sleep(10);
+	if (close(msg_sock) < 0)
+		syserr("close");
+
+	if(close(poll_tab[0].fd) < 0)
+		syserr("close");
+
+
+
+
+
+
+
+
+
+	/*unsigned short communicat[HEAD_SIZE];
 	memset(communicat, 0, HEAD_SIZE);
 	communicat[0] = htons(DISCOVER);
 	communicat[1] = htons(0);
@@ -171,7 +134,7 @@ int main(int argc, char *argv[]) {
 	while(!finish) {
 		char buf[BUFFER_SIZE];
 		memset(buf, 0, BUFFER_SIZE);
-		recvfrom(sockB, buf, BUFFER_SIZE, 0, NULL, NULL);
+		int rcv = recvfrom(sockB, buf, BUFFER_SIZE, 0, NULL, NULL);
 		//cerr << "typebefore:" << communicat[0] << " sizebefore:" << communicat[1] << "\n";
 		unsigned short type;
 		memcpy(&type, buf, 2);
@@ -186,7 +149,7 @@ int main(int argc, char *argv[]) {
 		communicat[0] = htons(KEEPALIVE);
 		communicat[1] = htons(0);
 
-		cerr << "send keep\n";
+		cerr << "received :" << rcv <<"\n";
 		sflags = 0;
 		rcva_len = (socklen_t) sizeof(my_address);
 
@@ -196,7 +159,7 @@ int main(int argc, char *argv[]) {
 
 	 if (close(sockB) == -1) { //very rare errors can occur here, but then
 		syserr("close"); //it's healthy to do the check
-	}
+	}*/
 
 	return 0;
 }

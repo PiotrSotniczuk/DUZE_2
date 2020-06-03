@@ -17,6 +17,6 @@ void read_header(bool *metaData, std::string *name, int *metaInt,
 
 // initiates poll table
 void init_poll(int sockA, const std::string& portB, struct pollfd *poll_tab,
-			   struct sockaddr_in *server);
+	const std::string& multi, struct ip_mreq *ip_mreq);
 
 #endif //DUZE_2__INITIALIZE_H_
