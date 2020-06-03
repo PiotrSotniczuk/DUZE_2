@@ -176,7 +176,7 @@ void read_header(bool *metaData, string *name, int *metaInt,
 			(*name) = string(str).substr(0, strlen(str) - 2);
 		}
 		// TODO
-		// cerr << string(line);
+		cerr << string(line);
 	}
 
 	// server does not support metaData
@@ -207,7 +207,7 @@ void init_poll(int sockA, const string& portB, struct pollfd *poll_tab,
 	(*server).sin_addr.s_addr = htonl(INADDR_ANY);
 	(*server).sin_port = htons(stoi(portB));
 	// TODO
-	cout << "portB " << stoi(portB) << "\n";
+	// cout << "portB " << stoi(portB) << "\n";
 	if (bind(poll_tab[0].fd, (struct sockaddr*)&(*server),
 			 (socklen_t)sizeof((*server))) < 0){
 		syserr("Binding stream socket");

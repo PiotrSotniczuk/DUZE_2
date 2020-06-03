@@ -8,6 +8,8 @@
 #include <stdlib.h>
 #include <sys/socket.h>
 #include "err.h"
+#include <signal.h>
+#include <cassert>
 
 #define ESSENTIALS_SUM 3
 #define ESSEN_H 0
@@ -22,9 +24,14 @@
 #define AUDIO 4
 #define METADATA 6
 
-#define BUFFER_SIZE 1000
+#define BUFFER_SIZE 10000
 
+bool finish;
 using namespace std;
+
+void sigint_handler([[maybe_unused]]int signal_num){
+	finish = true;
+}
 
 static void checkEssen(bool *essentials, int nr_essen){
 	if(essentials[nr_essen]){
@@ -79,6 +86,10 @@ int main(int argc, char *argv[]) {
 	unsigned long timeout;
 	set_args_client(argc, argv, &host, &portB, &portC, &timeout);
 
+	finish = false;
+	// catch signal
+	signal(SIGINT, sigint_handler);
+
 	int sockB;
 	struct addrinfo addr_hints;
 	struct addrinfo *addr_result;
@@ -122,7 +133,7 @@ int main(int argc, char *argv[]) {
 	communicat[0] = htons(DISCOVER);
 	communicat[1] = htons(0);
 
-	cout << "send: " <<  communicat[0]  <<
+	cerr << "send: " <<  communicat[0]  <<
 	" =ntohs"<< ntohs(communicat[0])<< "\n";
 	sflags = 0;
 	rcva_len = (socklen_t) sizeof(my_address);
@@ -136,11 +147,40 @@ int main(int argc, char *argv[]) {
 	char buf[BUFFER_SIZE];
 	memset(buf, 0, BUFFER_SIZE);
 	recvfrom(sockB, communicat, 4, 0, NULL, NULL);
-	cout << "\n" <<communicat[0] << "------" << communicat[1] << "\n";
+	cerr << "\n" <<communicat[0] << "------" << communicat[1] << "\n";
 	int type = ntohs(communicat[0]);
 	int size_rc = ntohs(communicat[1]);
-	cout << "received" << type << "\n" << size_rc <<"\n";
+	cerr << "received" << type << "\n" << size_rc <<"\n";
 
+
+	communicat[0] = htons(KEEPALIVE);
+	communicat[1] = htons(0);
+
+	cerr << "send: " <<  communicat[0]  <<
+		 " =ntohs"<< ntohs(communicat[0])<< "\n";
+	sflags = 0;
+	rcva_len = (socklen_t) sizeof(my_address);
+
+	snd_len = sendto(sockB, communicat, HEAD_SIZE, sflags,
+					 (struct sockaddr *) &my_address, rcva_len);
+	if (snd_len != (ssize_t) (HEAD_SIZE)) {
+		syserr("partial / failed write");
+	}
+
+	// ODBIOR DANYCH
+	while(!finish) {
+		char buf[BUFFER_SIZE];
+		memset(buf, 0, BUFFER_SIZE);
+		/*recvfrom(sockB, communicat, 4, 0, NULL, NULL);
+		cerr << "\n" << communicat[0] << "------" << communicat[1] << "\n";
+		int type = ntohs(communicat[0]);
+		assert(type == AUDIO);
+		size_rc = ntohs(communicat[1]);*/
+		recvfrom(sockB, buf, 4080, 0, NULL, NULL);
+		//cerr << "received" << type << "\n" << size_rc << "\n";
+		cerr << "-";
+		write(STDOUT_FILENO, buf, 4080);
+	}
 
 	 if (close(sockB) == -1) { //very rare errors can occur here, but then
 		syserr("close"); //it's healthy to do the check

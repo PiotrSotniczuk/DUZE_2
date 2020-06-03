@@ -8,7 +8,7 @@
 #include <poll.h>
 #include <netdb.h>
 #include <iostream>
-#include <set>
+#include <map>
 #include "RadioReader.h"
 #include <cstring>
 #include <chrono>
@@ -51,7 +51,8 @@ void print_cout_cerr(bool metaData,
 			break;
 		}
 		if ((poll_tab[0].revents & (POLLIN | POLLERR))
-			&& reader.readSendChunk(nullptr) < 0) {
+			&& reader.readSendChunk(map<struct sockaddr_in,
+				clock_t, addr_comp>(), 0) < 0) {
 			break;
 		}
 		poll_tab[0].revents = 0;
@@ -107,7 +108,8 @@ int main(int argc, char* argv[]) {
 	struct pollfd poll_tab[2];
 	init_poll(sockA, portB, poll_tab, &server);
 
-	set<struct sockaddr_in, addr_comp> clients_list = {};
+
+	map<struct sockaddr_in, clock_t, addr_comp> clients_map = {};
 	struct sockaddr_in client_address;
 	auto rcva_len = (socklen_t) sizeof(client_address);
 
@@ -143,27 +145,32 @@ int main(int argc, char* argv[]) {
 			if(ntohs(buf_rcv[1])){
 				// bad length
 				cerr << "Bad length of message\n";
-				continue;
 			}
 
-			switch (type) {
-				case DISCOVER:
-					clients_list.emplace(client_address);
-					sendto(poll_tab[0].fd, messageIAM, size_snd, 0,
-						   (struct sockaddr *) &client_address, rcva_len);
-					break;
-				case KEEPALIVE:
-					// TODO reset timer dodaj timer do seta zmien
-
-				default:
-					cout << "odd header\n";
+			if(type == DISCOVER) {
+				clock_t start = clock();
+				clients_map.emplace(client_address, start);
+				sendto(poll_tab[0].fd, messageIAM, size_snd, 0,
+					   (struct sockaddr *) &client_address, rcva_len);
 			}
+			if(type == KEEPALIVE){
+				auto it = clients_map.find(client_address);
+				if(it != clients_map.end()){
+					(*it).second = clock();
+				}
+
+			}
+			if(type != KEEPALIVE && type != DISCOVER){
+				cerr << "odd type\n";
+			}
+
 
 		}
 		if(poll_tab[1].revents & (POLLIN | POLLERR)) {
 			cerr << "Tak zlapalem server radio\n";
 			poll_tab[1].revents = 0;
-			reader.readSendChunk(&clients_list);
+			reader.readSendChunk(clients_map, poll_tab[0].fd);
+			// TODO
 			sleep(1);
 
 		}

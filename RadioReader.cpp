@@ -2,20 +2,21 @@
 #include <unistd.h>
 #include <iostream>
 #include <cassert>
+#include <cstring>
 
 using namespace std;
 
-int RadioReader::readSendChunk(set<struct sockaddr_in,
-	addr_comp> *clients_list){
+int RadioReader::readSendChunk(map<struct sockaddr_in, clock_t,
+	addr_comp> clients_map, int sockB){
 	if(meta){
-		return readSendMeta(clients_list);
+		return readSendMeta(clients_map, sockB);
 	}else{
-		return readSendNoMeta(clients_list);
+		return readSendNoMeta(clients_map, sockB);
 	}
 }
 
-int RadioReader::readSendNoMeta(set<struct sockaddr_in,
-									addr_comp> *clients_list){
+int RadioReader::readSendNoMeta(map<struct sockaddr_in, clock_t,
+									addr_comp> clients_map, int sockB){
 	int rv = read(sockA, buff, MAX_META_SIZE);
 	if(rv < 0){
 		return -1;
@@ -24,16 +25,18 @@ int RadioReader::readSendNoMeta(set<struct sockaddr_in,
 	if(to_cout) {
 		rv = write(STDOUT_FILENO, buff, size);
 	}else{
-		// TODO zakoduj wysylanie
-		for(sockaddr_in clients : (*clients_list)){
-			cout << "WYSYLAM COS NO META\n";
+		headerAUD[1] = ntohs(size);
+		memcpy(message, headerAUD, 4);
+		for(auto clients : clients_map){
+			sendto(sockB, buff, size, 0,
+				   (struct sockaddr *) &clients, (socklen_t) sizeof(clients));
 		}
 	}
 	return rv;
 }
 
-int RadioReader::readSendMeta(set<struct sockaddr_in,
-								  addr_comp> *clients_list){
+int RadioReader::readSendMeta(map<struct sockaddr_in, clock_t,
+								  addr_comp> clients_map, int sockB){
 	int toRead = metaInt - afterMeta - 1;
 	if(toRead > MAX_META_SIZE){
 		toRead = MAX_META_SIZE;
@@ -47,7 +50,7 @@ int RadioReader::readSendMeta(set<struct sockaddr_in,
 	if(to_cout){
 		rv = write(STDOUT_FILENO, buff, size);
 	}else{
-		for(sockaddr_in clients : (*clients_list)){
+		for(auto clients : clients_map){
 			cout << "WYSYLAM COS META\n";
 		}
 	}
@@ -59,7 +62,7 @@ int RadioReader::readSendMeta(set<struct sockaddr_in,
 			return -1;
 		}
 		if(rv == 1) {
-			if(readMeta(clients_list) < 0){
+			if(readMeta(clients_map, sockB) < 0){
 				return -1;
 			}
 		}
@@ -70,8 +73,8 @@ int RadioReader::readSendMeta(set<struct sockaddr_in,
 }
 
 // read number of bytes
-int RadioReader::readMeta(set<struct sockaddr_in,
-							  addr_comp> *clients_list){
+int RadioReader::readMeta(map<struct sockaddr_in, clock_t,
+							  addr_comp> clients_map, int sockB){
 	int rv = read(sockA, buff, 1);
 	if(rv < 0){
 		return -1;
@@ -89,7 +92,7 @@ int RadioReader::readMeta(set<struct sockaddr_in,
 				return -1;
 			}
 		}else{
-			for(sockaddr_in clients : (*clients_list)){
+			for(auto clients : clients_map){
 				cout << "WYSYLAM COS MET STDERRA\n";
 			}
 		}
