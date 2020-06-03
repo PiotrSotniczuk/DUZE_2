@@ -149,7 +149,7 @@ int main(int argc, char *argv[]) {
 	recvfrom(sockB, communicat, 4, 0, NULL, NULL);
 	cerr << "\n" <<communicat[0] << "------" << communicat[1] << "\n";
 	int type = ntohs(communicat[0]);
-	int size_rc = ntohs(communicat[1]);
+	unsigned short size_rc = ntohs(communicat[1]);
 	cerr << "received" << type << "\n" << size_rc <<"\n";
 
 
@@ -171,15 +171,17 @@ int main(int argc, char *argv[]) {
 	while(!finish) {
 		char buf[BUFFER_SIZE];
 		memset(buf, 0, BUFFER_SIZE);
-		/*recvfrom(sockB, communicat, 4, 0, NULL, NULL);
-		cerr << "\n" << communicat[0] << "------" << communicat[1] << "\n";
-		int type = ntohs(communicat[0]);
+		recvfrom(sockB, buf, BUFFER_SIZE, 0, NULL, NULL);
+		//cerr << "typebefore:" << communicat[0] << " sizebefore:" << communicat[1] << "\n";
+		unsigned short type;
+		memcpy(&type, buf, 2);
+		type = ntohs(type);
 		assert(type == AUDIO);
-		size_rc = ntohs(communicat[1]);*/
-		recvfrom(sockB, buf, 4080, 0, NULL, NULL);
-		//cerr << "received" << type << "\n" << size_rc << "\n";
-		cerr << "-";
-		write(STDOUT_FILENO, buf, 4080);
+		memcpy(&size_rc, buf + 2, 2);
+		size_rc = ntohs(size_rc);
+		cerr << "type real" << type << "sizereal;" << size_rc << "\n";
+		cerr << "\n";
+		write(STDOUT_FILENO, buf + HEAD_SIZE, size_rc);
 	}
 
 	 if (close(sockB) == -1) { //very rare errors can occur here, but then

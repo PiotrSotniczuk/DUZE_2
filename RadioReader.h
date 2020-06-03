@@ -4,11 +4,13 @@
 #include <string>
 #include <map>
 #include <netdb.h>
+#include <chrono>
 #define MAX_META_SIZE 4080
 #define HEAD_SIZE 4
 
 #define AUDIO 4
 #define METADATA 6
+
 
 struct addr_comp {
 	bool operator() (const sockaddr_in lhs,
@@ -29,16 +31,18 @@ class RadioReader {
  private:
 	int sockA;
 	char *buff;
-	short headerAUD[HEAD_SIZE/2];
-	short headerMETA[HEAD_SIZE/2];
+	short headerAUD[HEAD_SIZE];
+	short headerMETA[HEAD_SIZE];
 	char message[MAX_META_SIZE + HEAD_SIZE];
 	bool to_cout;
 	bool meta;
 	int metaInt;
 	int afterMeta;
-	int readSendNoMeta(std::map<struct sockaddr_in, clock_t, addr_comp> clients_map, int sockB);
-	int readSendMeta(std::map<struct sockaddr_in, clock_t, addr_comp> clients_map, int sockB);
-	int readMeta(std::map<struct sockaddr_in, clock_t, addr_comp> clients_map, int sockB);
+	int readSendNoMeta(std::map<struct sockaddr_in, std::chrono::time_point<std::chrono::steady_clock>, addr_comp> *clients_map, int sockB, int timeout);
+	int readSendMeta(std::map<struct sockaddr_in, std::chrono::time_point<std::chrono::steady_clock>, addr_comp> *clients_map, int sockB, int timeout);
+	int readMeta(std::map<struct sockaddr_in, std::chrono::time_point<std::chrono::steady_clock>, addr_comp> *clients_map, int sockB, int timeout);
+	void sendMessages(bool audio,
+		std::map<struct sockaddr_in, std::chrono::time_point<std::chrono::steady_clock>, addr_comp> *clients_map, int sockB, int size, int timeout);
 
  public:
 	RadioReader(bool meta, int metaInt,
@@ -53,7 +57,7 @@ class RadioReader {
 		headerMETA[0] = ntohs(METADATA);
 
 	}
-	int readSendChunk(std::map<struct sockaddr_in, clock_t, addr_comp> clients_map, int sockB);
+	int readSendChunk(std::map<struct sockaddr_in, std::chrono::time_point<std::chrono::steady_clock>, addr_comp> *clients_map, int sockB, int timeoutClient);
 };
 
 

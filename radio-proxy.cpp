@@ -24,6 +24,7 @@
 #define BUFF_SIZE 1024
 
 using namespace std;
+using namespace std::chrono;
 
 static bool finishA;
 static bool finishB;
@@ -51,8 +52,7 @@ void print_cout_cerr(bool metaData,
 			break;
 		}
 		if ((poll_tab[0].revents & (POLLIN | POLLERR))
-			&& reader.readSendChunk(map<struct sockaddr_in,
-				clock_t, addr_comp>(), 0) < 0) {
+			&& reader.readSendChunk(nullptr, 0, 0) < 0) {
 			break;
 		}
 		poll_tab[0].revents = 0;
@@ -109,7 +109,7 @@ int main(int argc, char* argv[]) {
 	init_poll(sockA, portB, poll_tab, &server);
 
 
-	map<struct sockaddr_in, clock_t, addr_comp> clients_map = {};
+	map<struct sockaddr_in, time_point<steady_clock>, addr_comp> clients_map = {};
 	struct sockaddr_in client_address;
 	auto rcva_len = (socklen_t) sizeof(client_address);
 
@@ -148,7 +148,7 @@ int main(int argc, char* argv[]) {
 			}
 
 			if(type == DISCOVER) {
-				clock_t start = clock();
+				time_point<steady_clock> start = steady_clock::now();
 				clients_map.emplace(client_address, start);
 				sendto(poll_tab[0].fd, messageIAM, size_snd, 0,
 					   (struct sockaddr *) &client_address, rcva_len);
@@ -156,7 +156,7 @@ int main(int argc, char* argv[]) {
 			if(type == KEEPALIVE){
 				auto it = clients_map.find(client_address);
 				if(it != clients_map.end()){
-					(*it).second = clock();
+					(*it).second = steady_clock::now();
 				}
 
 			}
@@ -169,9 +169,9 @@ int main(int argc, char* argv[]) {
 		if(poll_tab[1].revents & (POLLIN | POLLERR)) {
 			cerr << "Tak zlapalem server radio\n";
 			poll_tab[1].revents = 0;
-			reader.readSendChunk(clients_map, poll_tab[0].fd);
+			reader.readSendChunk(&clients_map, poll_tab[0].fd, timeoutB);
 			// TODO
-			sleep(1);
+			//sleep(1);
 
 		}
 
