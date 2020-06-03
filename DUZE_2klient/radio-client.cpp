@@ -182,6 +182,16 @@ int main(int argc, char *argv[]) {
 		cerr << "type real" << type << "sizereal;" << size_rc << "\n";
 		cerr << "\n";
 		write(STDOUT_FILENO, buf + HEAD_SIZE, size_rc);
+
+		communicat[0] = htons(KEEPALIVE);
+		communicat[1] = htons(0);
+
+		cerr << "send keep\n";
+		sflags = 0;
+		rcva_len = (socklen_t) sizeof(my_address);
+
+		sendto(sockB, communicat, HEAD_SIZE, sflags,
+						 (struct sockaddr *) &my_address, rcva_len);
 	}
 
 	 if (close(sockB) == -1) { //very rare errors can occur here, but then

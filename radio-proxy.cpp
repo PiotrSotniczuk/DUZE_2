@@ -170,8 +170,6 @@ int main(int argc, char* argv[]) {
 			cerr << "Tak zlapalem server radio\n";
 			poll_tab[1].revents = 0;
 			reader.readSendChunk(&clients_map, poll_tab[0].fd, timeoutB);
-			// TODO
-			//sleep(1);
 
 		}
 
