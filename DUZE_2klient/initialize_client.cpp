@@ -91,7 +91,7 @@ int get_socketB(const string& host, const string& portB, struct sockaddr_in *my_
 	return sock;
 }
 
-void init_poll_client(const string& portC, struct pollfd *poll_tab){
+void init_poll_client(const string& portC, struct pollfd *poll_tab, int sockB){
 
 	// get socket for poll_tab[0] (PF_INET = IPv4)
 	poll_tab[0].fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -116,4 +116,8 @@ void init_poll_client(const string& portC, struct pollfd *poll_tab){
 	// backlog 1, only one tcp accepted ?
 	if (listen(poll_tab[0].fd, 1) == -1)
 		syserr("Starting to listen");
+
+	poll_tab[1].fd = sockB;
+	poll_tab[1].events = POLLIN;
+	poll_tab[1].revents = 0;
 }

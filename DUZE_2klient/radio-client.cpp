@@ -12,6 +12,7 @@
 #include <cassert>
 #include <poll.h>
 #include "initialize_client.h"
+#include "Tel_Hand.h"
 
 #define HEAD_SIZE 4
 
@@ -42,41 +43,34 @@ int main(int argc, char *argv[]) {
 	// catch signal
 	signal(SIGINT, sigint_handler);
 
-	socklen_t rcva_len;
-	int sflags;
-	ssize_t snd_len, rcv_len;
-	struct sockaddr_in my_address{};
 	// get socket to sender
+	struct sockaddr_in my_address{};
 	int sockB = get_socketB(host, portB, &my_address);
 
-	struct pollfd poll_tab[0];
-	init_poll_client(portC, poll_tab);
+	struct pollfd poll_tab[2];
+	init_poll_client(portC, poll_tab, sockB);
 
 	struct sockaddr_in client_address{};
 	socklen_t client_address_len;
-	int msg_sock = accept(poll_tab[0].fd, (struct sockaddr *) &client_address, &client_address_len);
+	int msg_sock = accept(poll_tab[0].fd, (struct sockaddr *) &client_address,
+		&client_address_len);
 
-	if (msg_sock < 0)
+	if (msg_sock < 0){
+		if(close(poll_tab[0].fd) < 0)
+			syserr("close");
 		syserr("accept");
-
-	unsigned char do_linemode[3] = {255, 253, 34};
-	int len = 3;
-	write(msg_sock, do_linemode, len);
-	len = 7;
-	unsigned char linemode_options[7] = {255, 250, 34, 1, 0, 255, 240};
-	write(msg_sock, linemode_options, len);
-
-	//unsigned char will_echo[3] = {255, 251, 1};
-
-	char stuff[80];
-	int bw = snprintf(stuff, 80, "\x1b[0m\x1b[H\x1b[2J");
-	if (write(msg_sock, stuff, bw) == -1) {
-		perror("Unable to clear screen");
 	}
 
+	Tel_Hand tel_hand = Tel_Hand(msg_sock);
+	tel_hand.read_write_init();
+
+	socklen_t rcva_len;
+	int sflags;
+	ssize_t snd_len, rcv_len;
 
 
-	sleep(10);
+
+
 	if (close(msg_sock) < 0)
 		syserr("close");
 

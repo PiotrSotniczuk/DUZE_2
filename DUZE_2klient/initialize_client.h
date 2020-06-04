@@ -6,6 +6,6 @@ void set_args_client(int argc, char** argv, std::string *host,
 							std::string *portB, std::string *portC, int *timeoutA);
 
 int get_socketB(const std::string& host, const std::string& portB, struct sockaddr_in *my_address);
-void init_poll_client(const std::string& portC, struct pollfd *poll_tab);
+void init_poll_client(const std::string& portC, struct pollfd *poll_tab, int sockB);
 
 #endif
