@@ -104,7 +104,7 @@ int main(int argc, char* argv[]) {
 
 	// Part B
 	// initiate pollfd for receiving message
-	struct pollfd poll_tab[2];
+	struct pollfd poll_tab[3];
 	struct ip_mreq ip_mreq{};
 	init_poll(sockA, portB, poll_tab, multi, &ip_mreq);
 

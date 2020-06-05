@@ -8,6 +8,17 @@
 #define SENDER "Posrednik"
 
 using namespace std;
+void Tel_Hand::bold(string *menu, const string& line, int i){
+	if(act_line == i){
+		(*menu) += "\x1b[1;31m";
+	}
+	(*menu) += line;
+	if(act_line == i){
+		(*menu) += "\x1b[0m";
+	}
+	(*menu) += "\n";
+}
+
 int Tel_Hand::write_menu(){
 	string clear_term = "\x1b[0m\x1b[H\x1b[2J";
 	int i = 0;
@@ -17,26 +28,19 @@ int Tel_Hand::write_menu(){
 		return -1;
 	}
 
-	string menu = SEARCH;
-	if(act_line == i){
-		menu += " *";
-	}
-	menu += "\n";
+	string menu;
+	bold(&menu, SEARCH, i);
 	i++;
 
 	for(const string& sender : senders){
-		menu += SENDER + sender;
-		if(act_line == i){
-			menu += " *";
+		string sender_str = SENDER + sender;
+		if(playing == i - 1){
+			sender_str += " *";
 		}
-		menu += "\n";
+		bold(&menu, sender_str, i);
 		i++;
 	}
-	menu += END;
-	if(act_line == i){
-		menu += " *";
-	}
-	menu += "\n";
+	bold(&menu, END, i);
 
 	if(!meta.empty()){
 		menu += meta + "\n";
@@ -114,7 +118,13 @@ int Tel_Hand::read_write() {
 			return -1;
 		}
 		cerr << "Enter\n";
-		return 1;
+		if(act_line == 0) {
+			return SEARCH_RV;
+		}
+		if(act_line == (senders.size() + 1)){
+			return END_RV;
+		}
+		return act_line - 1 + VEC_BASE;
 	}
 
 	cerr << "What do you mean ?? Bad button clicked\n";
