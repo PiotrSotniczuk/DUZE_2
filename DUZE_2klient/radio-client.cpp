@@ -40,10 +40,9 @@ int main(int argc, char *argv[]) {
 	int timeout = 5;
 	set_args_client(argc, argv, &host, &portB, &portC, &timeout);
 
-	bool wait_telnet = false;
-
 	finishAll = false;
 	finishTel = false;
+	bool no_telnet = true;
 	// catch signal
 	signal(SIGINT, sigint_handler);
 
@@ -53,22 +52,12 @@ int main(int argc, char *argv[]) {
 	int sockC = init_sockC(portC);
 	//struct sockaddr_in client_address{};
 	//socklen_t client_address_len = 0;
-	int msg_sock = accept(sockC, nullptr, nullptr);
-	if (msg_sock < 0){
-		if (close(sockC) < 0)
-			syserr("close");
-		if(close(sockB))
-			syserr("close");
-		syserr("accept");
-	}
-	Tel_Hand tel_hand = Tel_Hand(msg_sock);
-	tel_hand.read_write_init();
+
+	Tel_Hand tel_hand = Tel_Hand(-1);
 
 	pollfd poll_tab[3];
-	init_poll_client(poll_tab, sockB, msg_sock);
-	poll_tab[2].fd = sockC;
-	poll_tab[2].events = POLL_IN;
-	poll_tab[2].revents = 0;
+	init_poll_client(poll_tab, sockB, sockC);
+
 
 	unsigned short discover[HEAD_SIZE];
 	memset(discover, 0, HEAD_SIZE);
@@ -110,20 +99,40 @@ int main(int argc, char *argv[]) {
 			if(ret == END_RV) {
 				break;
 			}
+			if(ret == SOCK_CLOSE){
+				no_telnet = true;
+				poll_tab[1].fd = -1;
+				tel_hand.msg_sock = -1;
+			}
+
 			if(ret >= VEC_BASE) {
 				// TODO odbierz numer z enterem
 			}
 			poll_tab[1].revents = 0;
 		}
-		if(poll_tab[2].revents & POLLIN) {
-			// TODO nowy telnet
+		if(poll_tab[2].revents & POLLIN && no_telnet) {
+
+			no_telnet = false;
+			int msg_sock = accept(sockC, nullptr, nullptr);
+			if (msg_sock < 0) {
+				if (close(sockC) < 0)
+					syserr("close");
+				if (close(sockB))
+					syserr("close");
+				syserr("accept");
+			}
+			tel_hand.msg_sock = msg_sock;
+			poll_tab[1].fd = msg_sock;
+			tel_hand.read_write_init();
+			poll_tab[2].revents = 0;
+
 		}
 	}
 
 
 	if (close(sockC) < 0)
 		syserr("close");
-	if (close(msg_sock) < 0)
+	if (tel_hand.msg_sock != -1 && close(tel_hand.msg_sock) < 0)
 		syserr("close");
 	if(close(sockB))
 		syserr("close");

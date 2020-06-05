@@ -10,7 +10,8 @@ int get_socketB(const std::string& host, const std::string& portB, struct sockad
 
 // 0 - UDP from sender
 // 1 - socket after connect
-void init_poll_client(struct pollfd *poll_tab, int sockB, int msg_sock);
+// 2- socket listening for new telnets
+void init_poll_client(struct pollfd *poll_tab, int sockB, int sockC);
 
 int init_sockC(const std::string& portC);
 

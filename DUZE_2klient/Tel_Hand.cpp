@@ -87,6 +87,12 @@ int Tel_Hand::read_write() {
 
 	cerr << "size read:" << rcv << "\n";
 
+	// socket closed
+	if(rcv == 0){
+		cerr << "socket closed\n";
+		return SOCK_CLOSE;
+	}
+
 	if (rcv > 3 || rcv < 2) {
 		cerr << "What do you mean ?? Bad button clicked\n";
 		return write_menu();

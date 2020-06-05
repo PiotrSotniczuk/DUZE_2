@@ -3,6 +3,7 @@
 
 #define SEARCH_RV 1
 #define END_RV 2
+#define SOCK_CLOSE 3
 #define VEC_BASE 10
 
 #include <vector>
@@ -11,13 +12,13 @@ class Tel_Hand {
  private:
 	int act_line;
 	std::string meta;
-	int msg_sock;
 	int write_menu();
 	void bold(std::string *menu, const std::string& line,int i);
 
  public:
 	int playing;
 	std::vector<std::string> senders;
+	int msg_sock;
 
 	Tel_Hand(int msg_sock){
 		this->msg_sock = msg_sock;
@@ -28,9 +29,9 @@ class Tel_Hand {
 	}
 	int read_write_init();
 	int read_write();
-	void set_msg_sock(int new_sock){
+	/*void set_msg_sock(int new_sock){
 		this->msg_sock = new_sock;
-	};
+	};*/
 
 
 

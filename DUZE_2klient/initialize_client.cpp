@@ -91,14 +91,18 @@ int get_socketB(const string& host, const string& portB, struct sockaddr_in *my_
 	return sock;
 }
 
-void init_poll_client(struct pollfd *poll_tab, int sockB, int msg_sock){
+void init_poll_client(struct pollfd *poll_tab, int sockB, int sockC){
 	poll_tab[0].fd = sockB;
 	poll_tab[0].events = POLLIN;
 	poll_tab[0].revents = 0;
 
-	poll_tab[1].fd = msg_sock;
+	poll_tab[1].fd = -1;
 	poll_tab[1].events = POLLIN;
 	poll_tab[1].revents = 0;
+
+	poll_tab[2].fd = sockC;
+	poll_tab[2].events = POLLIN;
+	poll_tab[2].revents = 0;
 }
 
 int init_sockC(const string& portC){
@@ -123,7 +127,7 @@ int init_sockC(const string& portC){
 
 	// backlog 1, only one tcp accepted ?
 	// TODO 1 ?
-	if (listen(sock, 1) == -1)
+	if (listen(sock, 0) == -1)
 		syserr("Starting to listen");
 	return sock;
 }
