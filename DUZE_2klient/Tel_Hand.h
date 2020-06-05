@@ -8,27 +8,45 @@
 
 #include <vector>
 #include <string>
+#include <map>
+// TODO include from RadioReader
+#include <netdb.h>
+#include <unistd.h>
+struct addr_comp_client {
+	bool operator() (const sockaddr_in lhs,
+					 const sockaddr_in rhs) const {
+		if(lhs.sin_addr.s_addr < rhs.sin_addr.s_addr){
+			return true;
+		}
+		if(lhs.sin_addr.s_addr > rhs.sin_addr.s_addr){
+			return false;
+		}
+		// s_addr is equal
+		return lhs.sin_port < rhs.sin_port;
+	}
+};
+
 class Tel_Hand {
  private:
 	int act_line;
-	std::string meta;
-	int write_menu();
 	void bold(std::string *menu, const std::string& line,int i);
 
  public:
-	int playing;
-	std::vector<std::string> senders;
+	std::map<struct sockaddr_in, std::string, addr_comp_client>::iterator playing;
+	std::map<struct sockaddr_in, std::string, addr_comp_client> senders;
 	int msg_sock;
+	std::string meta;
 
 	Tel_Hand(int msg_sock){
 		this->msg_sock = msg_sock;
 		act_line = 0;
-		senders = std::vector<std::string>();
+		senders = {};
 		meta = std::string();
-		playing = -1;
+		playing = senders.end();
 	}
 	int read_write_init();
 	int read_write();
+	int write_menu();
 	/*void set_msg_sock(int new_sock){
 		this->msg_sock = new_sock;
 	};*/

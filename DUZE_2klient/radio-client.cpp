@@ -13,6 +13,7 @@
 #include <poll.h>
 #include "initialize_client.h"
 #include "Tel_Hand.h"
+#include <chrono>
 
 #define HEAD_SIZE 4
 
@@ -28,8 +29,8 @@
 #define BUFFER_TEL_SIZE   200
 
 bool finishAll;
-bool finishTel;
 using namespace std;
+using namespace std::chrono;
 
 void sigint_handler([[maybe_unused]]int signal_num){
 	finishAll = true;
@@ -41,7 +42,6 @@ int main(int argc, char *argv[]) {
 	set_args_client(argc, argv, &host, &portB, &portC, &timeout);
 
 	finishAll = false;
-	finishTel = false;
 	bool no_telnet = true;
 	// catch signal
 	signal(SIGINT, sigint_handler);
@@ -50,9 +50,8 @@ int main(int argc, char *argv[]) {
 	struct sockaddr_in my_address{};
 	int sockB = get_socketB(host, portB, &my_address);
 	int sockC = init_sockC(portC);
-	//struct sockaddr_in client_address{};
-	//socklen_t client_address_len = 0;
 
+	time_point<steady_clock> keep_alive_time;
 	Tel_Hand tel_hand = Tel_Hand(-1);
 
 	pollfd poll_tab[3];
@@ -64,36 +63,67 @@ int main(int argc, char *argv[]) {
 	discover[0] = htons(DISCOVER);
 	discover[1] = htons(0);
 
-	auto rcva_len = (socklen_t) sizeof(my_address);
+	unsigned short keep_alive_com[HEAD_SIZE];
+	memset(keep_alive_com, 0, HEAD_SIZE);
+	keep_alive_com[0] = htons(KEEPALIVE);
+	keep_alive_com[1] = htons(0);
+
+	char buf[BUFFER_SIZE];
 
 	while(!finishAll){
 		// TODO change timeout
-		int ret_poll = poll(poll_tab, 3, timeout * 6969);
-		if(ret_poll <= 0){
-			// nothing came especialyy from B
-			// actualize list
-			if(ret_poll < 0){
-				cerr << "poll mistake\n";
-			}else {
-				cerr << "timeout\n";
-			}
+		int ret_poll = poll(poll_tab, 3, 2000);
+		if(ret_poll < 0) {
+			cerr << "timeout\n";
 			break;
+		}
+		if(ret_poll == 0){
+			cerr << "poll nothing happened\n";
 		}
 		// sockB
 		if(poll_tab[0].revents & POLLIN) {
-			// TODO odbieram od chujka proxy
+			// MOZNA USUNAC
+			socklen_t rcv_len;
+			struct sockaddr_in rcv_address{};
+			int rcv = recvfrom(sockB, buf, BUFFER_SIZE, 0, (struct sockaddr *) &rcv_address,
+				&rcv_len);
+			assert(rcv >= 0);
+
+			unsigned short communicat[HEAD_SIZE];
+			memcpy(communicat, buf, 4);
+			int type = ntohs(communicat[0]);
+			unsigned short size_rc = ntohs(communicat[1]);
+			assert(size_rc == (rcv - HEAD_SIZE));
+			cerr << "received type: " << type << "  size:" << size_rc <<"\n";
+			buf[HEAD_SIZE + size_rc] = 0;
+			switch (type){
+				case IAM:
+					tel_hand.senders.emplace(rcv_address, string(buf + HEAD_SIZE));
+					tel_hand.write_menu();
+					break;
+				case AUDIO:
+					printf("%.*s", size_rc, buf + HEAD_SIZE);
+					break;
+				case METADATA:
+					// only need string so dont care about zeros
+					tel_hand.meta = string (buf);
+					tel_hand.write_menu();
+					break;
+				default:
+					cerr << "weird HEADER from proxy\n";
+			}
+
 			poll_tab[0].revents = 0;
 		}
 		// telnet
 		if(poll_tab[1].revents & POLLIN) {
-			// TODO odbieram od chujka telnet
 			int ret = tel_hand.read_write();
 			if(ret < 0) {
 				break;
 			}
 			if(ret == SEARCH_RV) {
 				int snd_size = sendto(sockB, discover, HEAD_SIZE, 0,
-									  (struct sockaddr *) &my_address, rcva_len);
+									  (struct sockaddr *) &my_address, sizeof(my_address));
 				assert(snd_size == HEAD_SIZE);
 			}
 			if(ret == END_RV) {
@@ -106,7 +136,17 @@ int main(int argc, char *argv[]) {
 			}
 
 			if(ret >= VEC_BASE) {
-				// TODO odbierz numer z enterem
+				auto it = tel_hand.senders.begin();
+				for(int i=0; i<ret-VEC_BASE; i++){
+					it++;
+				}
+				tel_hand.playing = it;
+				keep_alive_time = steady_clock::now();
+				struct sockaddr_in chosen = it->first;
+				int snd_size = sendto(sockB, discover, HEAD_SIZE, 0,
+									  (struct sockaddr *) &chosen, sizeof(chosen));
+				assert(snd_size == HEAD_SIZE);
+				tel_hand.write_menu();
 			}
 			poll_tab[1].revents = 0;
 		}
@@ -127,6 +167,16 @@ int main(int argc, char *argv[]) {
 			poll_tab[2].revents = 0;
 
 		}
+
+		if(tel_hand.playing != tel_hand.senders.end() &&
+		(steady_clock::now() - keep_alive_time).count()/1000000 > 3500){
+			struct sockaddr_in chosen = tel_hand.playing->first;
+			int snd_size = sendto(sockB, keep_alive_com, HEAD_SIZE, 0,
+								  (struct sockaddr *) &chosen, sizeof(chosen));
+			assert(snd_size == HEAD_SIZE);
+		}
+
+		// TODO set timeout for proxy and
 	}
 
 

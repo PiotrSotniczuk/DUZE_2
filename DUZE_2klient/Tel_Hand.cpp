@@ -32,9 +32,9 @@ int Tel_Hand::write_menu(){
 	bold(&menu, SEARCH, i);
 	i++;
 
-	for(const string& sender : senders){
-		string sender_str = SENDER + sender;
-		if(playing == i - 1){
+	for(auto sender = senders.begin(); sender != senders.end(); sender++){
+		string sender_str = SENDER + sender->second;
+		if(playing == sender){
 			sender_str += " *";
 		}
 		bold(&menu, sender_str, i);
@@ -123,11 +123,12 @@ int Tel_Hand::read_write() {
 		if (write_menu() < 0) {
 			return -1;
 		}
-		cerr << "Enter\n";
 		if(act_line == 0) {
+			cerr << "search\n";
 			return SEARCH_RV;
 		}
 		if(act_line == (senders.size() + 1)){
+			cerr << "End\n";
 			return END_RV;
 		}
 		return act_line - 1 + VEC_BASE;
