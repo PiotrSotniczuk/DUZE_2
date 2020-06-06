@@ -5,7 +5,7 @@
 #define WEIRD_RESP_SIZE 10000
 #define SEARCH "Szukaj posrednika"
 #define END "Koniec"
-#define SENDER "Posrednik"
+#define SENDER "Posrednik "
 
 using namespace std;
 void Tel_Hand::bold(string *menu, const string& line, int i){
@@ -136,4 +136,8 @@ int Tel_Hand::read_write() {
 
 	cerr << "What do you mean ?? Bad button clicked\n";
 	return write_menu();
+}
+
+bool addr_equal(struct sockaddr_in a, struct sockaddr_in b){
+	return (a.sin_addr.s_addr == b.sin_addr.s_addr && a.sin_port == b.sin_port);
 }

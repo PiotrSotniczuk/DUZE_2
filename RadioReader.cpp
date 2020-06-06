@@ -18,6 +18,9 @@ int RadioReader::readSendChunk(map<struct sockaddr_in, time_point<steady_clock>,
 
 void RadioReader::sendMessages(bool audio, map<struct sockaddr_in, time_point<steady_clock>,
 								  addr_comp> *clients_map, int sockB, int size, int timeout){
+	if(size == 0){
+		return;
+	}
 	if(audio){
 		headerAUD[1] = ntohs(size);
 		memcpy(message, headerAUD, 4);
@@ -27,8 +30,8 @@ void RadioReader::sendMessages(bool audio, map<struct sockaddr_in, time_point<st
 	}
 	time_point<steady_clock> now = steady_clock::now();
 	for(auto client = clients_map->begin();  client != clients_map->end(); ){
-		cerr << (now - client->second).count()/1000000 <<"?" <<1000 * timeout<< "\n";
-	 	if((now - client->second).count()/1000000 > 1000 * timeout){
+		cerr << "milis to end: " <<duration_cast<milliseconds>(now - client->second).count() <<"<" <<1000 * timeout<< "\n";
+	 	if(duration_cast<milliseconds>(now - client->second).count() > 1000 * timeout){
 	 		client = clients_map->erase(client);
 			continue;
 	 	}

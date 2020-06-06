@@ -21,6 +21,15 @@ static void checkEssen(bool *essentials, int nr_essen){
 	essentials[nr_essen] = true;
 }
 
+static void set_arg(char** argv, int i, bool *essentials,
+	char flag, string *to_set, int ESSEN){
+	const char str[3] = {'-', flag, 0};
+	if(strcmp(argv[i], str) == 0){
+		checkEssen(essentials, ESSEN);
+		(*to_set) = argv[i+1];
+	}
+}
+
 void set_args_client(int argc, char** argv, string *host,
 							string *portB, string *portC, int *timeoutA){
 	bool essentials[ESSENTIALS_SUM];
@@ -30,20 +39,9 @@ void set_args_client(int argc, char** argv, string *host,
 
 	memset(essentials, false, 3);
 	for(int i = 1; i < argc; i = i + 2){
-		if(strcmp(argv[i], "-H") == 0){
-			checkEssen(essentials, ESSEN_H);
-			(*host) = argv[i+1];
-		}
-
-		if(strcmp(argv[i], "-P") == 0){
-			checkEssen(essentials, ESSEN_PB);
-			(*portB) = argv[i+1];
-		}
-
-		if(strcmp(argv[i], "-p") == 0){
-			checkEssen(essentials, ESSEN_PC);
-			(*portC) = argv[i+1];
-		}
+		set_arg(argv, i, essentials, 'H', host, ESSEN_H);
+		set_arg(argv, i, essentials, 'P', portB, ESSEN_PB);
+		set_arg(argv, i, essentials, 'p', portC, ESSEN_PC);
 
 		if(strcmp(argv[i], "-T") == 0){
 			(*timeoutA) = stoi(argv[i+1]);

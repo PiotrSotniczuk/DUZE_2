@@ -26,9 +26,10 @@ struct addr_comp_client {
 	}
 };
 
+bool addr_equal(struct sockaddr_in a, struct sockaddr_in b);
+
 class Tel_Hand {
  private:
-	int act_line;
 	void bold(std::string *menu, const std::string& line,int i);
 
  public:
@@ -36,6 +37,7 @@ class Tel_Hand {
 	std::map<struct sockaddr_in, std::string, addr_comp_client> senders;
 	int msg_sock;
 	std::string meta;
+	int act_line;
 
 	Tel_Hand(int msg_sock){
 		this->msg_sock = msg_sock;
@@ -47,12 +49,6 @@ class Tel_Hand {
 	int read_write_init();
 	int read_write();
 	int write_menu();
-	/*void set_msg_sock(int new_sock){
-		this->msg_sock = new_sock;
-	};*/
-
-
-
 };
 
 #endif

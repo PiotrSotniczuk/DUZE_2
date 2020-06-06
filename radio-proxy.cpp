@@ -133,7 +133,6 @@ int main(int argc, char* argv[]) {
 
 		// client request
 		if (poll_tab[0].revents & (POLLIN | POLLERR)) {
-			cerr << "Tak kurna zlapalem clienta\n";
 			poll_tab[0].revents = 0;
 			if(recvfrom(poll_tab[0].fd, buf_rcv, HEAD_SIZE, 0,
 				(struct sockaddr *) &client_address, &rcva_len) < 0){
@@ -147,9 +146,14 @@ int main(int argc, char* argv[]) {
 				cerr << "Bad length of message\n";
 			}
 
+			cerr << "client msg typ: " << type << "\n";
+
 			if(type == DISCOVER) {
 				time_point<steady_clock> start = steady_clock::now();
-				clients_map.emplace(client_address, start);
+				if(clients_map.emplace(client_address, start).second == false){
+					//already have so lets act like it is keepalive
+					type = KEEPALIVE;
+				}
 				sendto(poll_tab[0].fd, messageIAM, size_snd + HEAD_SIZE, 0,
 					   (struct sockaddr *) &client_address, rcva_len);
 			}
